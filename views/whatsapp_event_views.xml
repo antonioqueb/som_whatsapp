@@ -1,0 +1,62 @@
+<odoo>
+    <record id="view_whatsapp_event_form" model="ir.ui.view">
+        <field name="name">whatsapp.event.form</field>
+        <field name="model">whatsapp.event</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_test_send" type="object" string="Probar con el último registro" class="btn-secondary"
+                            confirm="Se enviará un WhatsApp real al destinatario del último registro del modelo. ¿Continuar?"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" icon="fa-paper-plane" disabled="1"><field name="sent_count" widget="statinfo" string="Enviados"/></button>
+                    </div>
+                    <div class="oe_title"><h1><field name="name" placeholder="Ej. Aviso de pedido confirmado"/></h1></div>
+                    <group>
+                        <group string="Disparo">
+                            <field name="key" placeholder="sale.order.confirmed"/>
+                            <field name="model_id" options="{'no_create': True}"/>
+                            <field name="trigger"/>
+                            <field name="watch_fields" invisible="trigger != 'on_write'" placeholder="state,date_order"/>
+                            <field name="domain" widget="domain" options="{'model': 'model_name'}"/>
+                            <field name="model_name" invisible="1"/>
+                        </group>
+                        <group string="Mensaje y destinatario">
+                            <field name="template_id" options="{'no_create': True}"/>
+                            <field name="account_id" options="{'no_create': True}"/>
+                            <field name="recipient_mode"/>
+                            <field name="recipient_path" invisible="recipient_mode == 'fixed'"/>
+                            <field name="fixed_phone" invisible="recipient_mode != 'fixed'"/>
+                            <field name="send_now"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-secondary" role="alert">
+                        <strong>Cómo se conecta un proceso:</strong> desde el código del proceso,
+                        <code>self.env['whatsapp.event'].fire('<i>clave</i>', registros)</code>; o hereda
+                        <code>whatsapp.notify.mixin</code> en el modelo y usa disparo <em>Al crear</em> / <em>Al modificar</em>.
+                        Si la plantilla lleva reporte PDF, se adjunta.
+                    </div>
+                    <group string="Notas"><field name="notes" nolabel="1"/></group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_whatsapp_event_list" model="ir.ui.view">
+        <field name="name">whatsapp.event.list</field>
+        <field name="model">whatsapp.event</field>
+        <field name="arch" type="xml">
+            <list><field name="name"/><field name="key"/><field name="model_id"/><field name="trigger"/><field name="template_id"/><field name="recipient_mode"/><field name="sent_count"/><field name="active" widget="boolean_toggle"/></list>
+        </field>
+    </record>
+    <record id="action_whatsapp_event" model="ir.actions.act_window">
+        <field name="name">Puntos de conexión</field>
+        <field name="res_model">whatsapp.event</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Sin puntos de conexión</p>
+            <p>Cada punto liga un evento de un modelo con una plantilla y un destinatario. Los procesos del sistema los disparan por su clave.</p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,19 @@
+# Gateway WhatsApp (Baileys) para Odoo SOM.
+# Se une a la red del stack de Odoo (recubrimientos_default) para que Odoo lo
+# alcance como http://som-whatsapp-gateway:3000 y el gateway a Odoo como
+# http://odoo19-prod-recubrimientos:8069. Solo se publica en localhost.
+services:
+  som-whatsapp-gateway:
+    build: .
+    container_name: som-whatsapp-gateway
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8110:3000"
+    volumes:
+      - ./sessions:/data/sessions
+    networks:
+      - recubrimientos_default
+networks:
+  recubrimientos_default:
+    external: true

@@ -1,0 +1,9 @@
+<odoo>
+    <menuitem id="menu_whatsapp_root" name="WhatsApp" sequence="80"
+              web_icon="som_whatsapp,static/description/icon.svg" groups="som_whatsapp.group_whatsapp_user"/>
+    <menuitem id="menu_whatsapp_messages" name="Mensajes" parent="menu_whatsapp_root" action="action_whatsapp_message" sequence="10"/>
+    <menuitem id="menu_whatsapp_accounts" name="Cuentas" parent="menu_whatsapp_root" action="action_whatsapp_account" sequence="20" groups="som_whatsapp.group_whatsapp_manager"/>
+    <menuitem id="menu_whatsapp_templates" name="Plantillas" parent="menu_whatsapp_root" action="action_whatsapp_template" sequence="30" groups="som_whatsapp.group_whatsapp_manager"/>
+    <menuitem id="menu_whatsapp_events" name="Puntos de conexión" parent="menu_whatsapp_root" action="action_whatsapp_event" sequence="40" groups="som_whatsapp.group_whatsapp_manager"/>
+    <menuitem id="menu_whatsapp_config" name="Ajustes" parent="menu_whatsapp_root" action="action_whatsapp_config" sequence="90" groups="som_whatsapp.group_whatsapp_manager"/>
+</odoo>

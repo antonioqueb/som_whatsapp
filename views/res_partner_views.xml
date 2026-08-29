@@ -1,0 +1,17 @@
+<odoo>
+    <record id="view_partner_form_whatsapp" model="ir.ui.view">
+        <field name="name">res.partner.form.whatsapp</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_whatsapp" type="object" class="oe_stat_button" icon="fa-whatsapp" groups="som_whatsapp.group_whatsapp_user">
+                    <field name="whatsapp_message_count" widget="statinfo" string="WhatsApp"/>
+                </button>
+            </xpath>
+            <xpath expr="//field[@name='phone'][not(ancestor::field)]" position="after">
+                <field name="whatsapp_opt_out" groups="som_whatsapp.group_whatsapp_user"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

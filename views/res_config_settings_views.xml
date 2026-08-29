@@ -1,0 +1,45 @@
+<odoo>
+    <record id="res_config_settings_view_form_whatsapp" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.whatsapp</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="WhatsApp" string="WhatsApp" name="som_whatsapp" groups="som_whatsapp.group_whatsapp_manager">
+                    <block title="Gateway Baileys" name="whatsapp_gateway_block">
+                        <setting string="Conexión al gateway" help="Servicio Node (Baileys) con API HTTP. Dentro de Docker: http://som-whatsapp-gateway:3000">
+                            <div class="row mt8">
+                                <label for="wa_gateway_url" class="col-lg-4 o_light_label"/><field name="wa_gateway_url"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="wa_api_key" class="col-lg-4 o_light_label"/><field name="wa_api_key" password="True"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="wa_webhook_token" class="col-lg-4 o_light_label"/><field name="wa_webhook_token" password="True"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="wa_default_country_code" class="col-lg-4 o_light_label"/><field name="wa_default_country_code"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="wa_timeout" class="col-lg-4 o_light_label"/><field name="wa_timeout"/>
+                            </div>
+                            <div class="mt16">
+                                <button name="action_wa_test" type="object" string="Probar conexión" class="btn-primary" icon="fa-plug"/>
+                            </div>
+                            <div class="text-muted mt8">
+                                El webhook de entrada es <code>/som_whatsapp/webhook</code>; el gateway debe apuntar ahí con el mismo token.
+                            </div>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+    <record id="action_whatsapp_config" model="ir.actions.act_window">
+        <field name="name">Ajustes WhatsApp</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'som_whatsapp'}</field>
+    </record>
+</odoo>

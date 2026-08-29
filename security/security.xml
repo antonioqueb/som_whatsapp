@@ -1,0 +1,28 @@
+<odoo>
+    <record id="module_category_whatsapp" model="ir.module.category">
+        <field name="name">WhatsApp</field>
+        <field name="sequence">95</field>
+    </record>
+    <record id="privilege_whatsapp" model="res.groups.privilege">
+        <field name="name">WhatsApp</field>
+        <field name="category_id" ref="module_category_whatsapp"/>
+        <field name="sequence">95</field>
+    </record>
+    <record id="group_whatsapp_user" model="res.groups">
+        <field name="name">Usuario</field>
+        <field name="privilege_id" ref="privilege_whatsapp"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Envía WhatsApp desde registros y consulta la bitácora.</field>
+    </record>
+    <record id="group_whatsapp_manager" model="res.groups">
+        <field name="name">Administrador</field>
+        <field name="privilege_id" ref="privilege_whatsapp"/>
+        <field name="implied_ids" eval="[(4, ref('group_whatsapp_user'))]"/>
+        <field name="comment">Configura gateway, cuentas (QR), plantillas y puntos de conexión.</field>
+    </record>
+    <record id="whatsapp_message_company_rule" model="ir.rule">
+        <field name="name">WhatsApp: multi-compañía</field>
+        <field name="model_id" ref="model_whatsapp_message"/>
+        <field name="domain_force">[('company_id', 'in', company_ids + [False])]</field>
+    </record>
+</odoo>

@@ -1,0 +1,39 @@
+<odoo>
+    <record id="view_whatsapp_template_form" model="ir.ui.view">
+        <field name="name">whatsapp.template.form</field>
+        <field name="model">whatsapp.template</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" placeholder="Ej. Pedido confirmado"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="model_id" options="{'no_create': True}"/>
+                            <field name="attach_report_id" options="{'no_create': True}"/>
+                        </group>
+                        <group>
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group string="Mensaje">
+                        <field name="body" nolabel="1" placeholder="Hola {{ object.partner_id.name }}, tu pedido {{ object.name }} fue confirmado. Total: {{ object.amount_total }}."/>
+                    </group>
+                    <div class="text-muted">Marcadores: <code>{{ object.campo }}</code> (registro), <code>{{ user.name }}</code>, <code>{{ ctx.get('dato') }}</code> (contexto extra al disparar).</div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_whatsapp_template_list" model="ir.ui.view">
+        <field name="name">whatsapp.template.list</field>
+        <field name="model">whatsapp.template</field>
+        <field name="arch" type="xml">
+            <list><field name="name"/><field name="model_id"/><field name="attach_report_id"/><field name="active" widget="boolean_toggle"/></list>
+        </field>
+    </record>
+    <record id="action_whatsapp_template" model="ir.actions.act_window">
+        <field name="name">Plantillas WhatsApp</field>
+        <field name="res_model">whatsapp.template</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

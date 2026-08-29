@@ -1,0 +1,77 @@
+<odoo>
+    <record id="view_whatsapp_account_form" model="ir.ui.view">
+        <field name="name">whatsapp.account.form</field>
+        <field name="model">whatsapp.account</field>
+        <field name="arch" type="xml">
+            <form string="Cuenta WhatsApp">
+                <header>
+                    <button name="action_start" type="object" string="Iniciar / Generar QR" class="btn-primary"
+                            invisible="state == 'connected'" groups="som_whatsapp.group_whatsapp_manager"/>
+                    <button name="action_refresh" type="object" string="Actualizar estado" class="btn-secondary"/>
+                    <button name="action_test" type="object" string="Probar gateway" class="btn-secondary"/>
+                    <button name="action_logout" type="object" string="Cerrar sesión" class="btn-secondary"
+                            invisible="state in ('stopped', 'logged_out')" groups="som_whatsapp.group_whatsapp_manager"
+                            confirm="Se cerrará la sesión de WhatsApp de este número y habrá que volver a escanear el QR. ¿Continuar?"/>
+                    <field name="state" widget="statusbar" statusbar_visible="stopped,qr,connected"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_messages" type="object" class="oe_stat_button" icon="fa-comments">
+                            <field name="message_count" widget="statinfo" string="Mensajes"/>
+                        </button>
+                    </div>
+                    <div class="oe_title"><h1><field name="name" placeholder="Ej. Ventas SOM MTY"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="session_key" placeholder="ventas-mty" readonly="state not in ('stopped', 'logged_out')"/>
+                            <field name="is_default"/>
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="phone"/>
+                            <field name="last_sync"/>
+                            <field name="qr_at" invisible="not qr_image"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert" invisible="state != 'qr'">
+                        <strong>Escanea el QR</strong> desde el teléfono: WhatsApp › Dispositivos vinculados › Vincular dispositivo.
+                        El código caduca en ~1 minuto; si no aparece o caducó, pulsa <em>Actualizar estado</em> o <em>Iniciar / Generar QR</em>.
+                    </div>
+                    <div class="alert alert-success" role="alert" invisible="state != 'connected'">
+                        Conectada con el número <strong><field name="phone" readonly="1" class="oe_inline"/></strong>. Lista para enviar y recibir.
+                    </div>
+                    <group string="Emparejamiento" invisible="not qr_image">
+                        <field name="qr_image" widget="image" nolabel="1" options="{'size': [320, 320]}"/>
+                    </group>
+                    <group string="Notas"><field name="notes" nolabel="1"/></group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="view_whatsapp_account_list" model="ir.ui.view">
+        <field name="name">whatsapp.account.list</field>
+        <field name="model">whatsapp.account</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="session_key"/>
+                <field name="phone"/>
+                <field name="is_default"/>
+                <field name="last_sync"/>
+                <field name="state" widget="badge" decoration-success="state == 'connected'" decoration-warning="state == 'qr'" decoration-danger="state in ('disconnected', 'logged_out')"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_whatsapp_account" model="ir.actions.act_window">
+        <field name="name">Cuentas WhatsApp</field>
+        <field name="res_model">whatsapp.account</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Crea tu primera cuenta</p>
+            <p>Dale una clave de sesión (p. ej. <b>ventas-mty</b>), pulsa <b>Iniciar / Generar QR</b> y escanéalo desde el teléfono.</p>
+        </field>
+    </record>
+</odoo>

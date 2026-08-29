@@ -1,0 +1,79 @@
+<odoo>
+    <record id="view_whatsapp_message_list" model="ir.ui.view">
+        <field name="name">whatsapp.message.list</field>
+        <field name="model">whatsapp.message</field>
+        <field name="arch" type="xml">
+            <list decoration-danger="state == 'failed'" decoration-info="direction == 'in'" create="0">
+                <field name="create_date" string="Fecha"/>
+                <field name="direction" widget="badge" decoration-info="direction == 'in'" decoration-success="direction == 'out'"/>
+                <field name="account_id" optional="show"/>
+                <field name="partner_id"/>
+                <field name="phone"/>
+                <field name="body"/>
+                <field name="attachment_id" optional="show"/>
+                <field name="res_ref" optional="show"/>
+                <field name="event_id" optional="hide"/>
+                <field name="state" widget="badge" decoration-success="state in ('delivered', 'read')" decoration-info="state == 'sent'" decoration-warning="state == 'queued'" decoration-danger="state == 'failed'"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_whatsapp_message_form" model="ir.ui.view">
+        <field name="name">whatsapp.message.form</field>
+        <field name="model">whatsapp.message</field>
+        <field name="arch" type="xml">
+            <form create="0">
+                <header>
+                    <button name="action_send_now" type="object" string="Enviar ahora" class="btn-primary" invisible="direction != 'out' or state not in ('queued', 'failed')"/>
+                    <button name="action_retry" type="object" string="Reintentar" class="btn-secondary" invisible="state != 'failed'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="direction"/>
+                            <field name="account_id"/>
+                            <field name="partner_id"/>
+                            <field name="phone"/>
+                            <field name="jid"/>
+                        </group>
+                        <group>
+                            <field name="res_ref"/>
+                            <field name="event_id"/>
+                            <field name="template_id"/>
+                            <field name="user_id"/>
+                            <field name="sent_date"/>
+                            <field name="status_date"/>
+                            <field name="wa_message_id"/>
+                            <field name="retry_count" invisible="not retry_count"/>
+                        </group>
+                    </group>
+                    <group string="Mensaje"><field name="body" nolabel="1"/></group>
+                    <group><field name="attachment_id" invisible="not attachment_id"/></group>
+                    <group string="Error" invisible="not error"><field name="error" nolabel="1"/></group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_whatsapp_message_search" model="ir.ui.view">
+        <field name="name">whatsapp.message.search</field>
+        <field name="model">whatsapp.message</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="partner_id"/><field name="phone"/><field name="body"/>
+                <filter name="out" string="Enviados" domain="[('direction', '=', 'out')]"/>
+                <filter name="in" string="Recibidos" domain="[('direction', '=', 'in')]"/>
+                <separator/>
+                <filter name="queued" string="En cola" domain="[('state', '=', 'queued')]"/>
+                <filter name="failed" string="Fallidos" domain="[('state', '=', 'failed')]"/>
+                <filter name="group_partner" string="Contacto" context="{'group_by': 'partner_id'}"/>
+                <filter name="group_event" string="Punto de conexión" context="{'group_by': 'event_id'}"/>
+                <filter name="group_day" string="Día" context="{'group_by': 'create_date:day'}"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_whatsapp_message" model="ir.actions.act_window">
+        <field name="name">Mensajes WhatsApp</field>
+        <field name="res_model">whatsapp.message</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
