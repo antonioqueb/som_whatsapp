@@ -205,6 +205,7 @@ class WhatsappEvent(models.Model):
             'ref': ref,
             'client': (partner and partner.display_name) or (record._name == 'whatsapp.message' and record.pushname) or '',
             'client_phone': client_phone,
+            'client_phone_pretty': self._wa_pretty_phone(client_phone),
             'client_link': self._wa_link(client_phone) if client_phone else '',
             'seller': seller_name,
             'seller_phone': seller_phone,
@@ -278,9 +279,8 @@ class WhatsappEvent(models.Model):
             if fallback:
                 base = self._wa_base_ctx(message)
                 base.update(ctx)
-                text = ('📨 *Mensaje de cliente sin asesor asignado*\n👤 %s · %s\n📋 Ref: %s\n💬 "%s"\n\n'
-                        'Asigna un vendedor y contáctalo: %s') % (
-                    base['client'] or 'Desconocido', base['client_phone'], base['ref'] or '—', base['client_text'], base['client_link'])
+                text = ('📨 Mensaje de cliente *sin asesor asignado*: %s%s\n"%s"\nAsigna un vendedor y contáctalo. Su número: %s') % (
+                    base['client'] or 'Desconocido', (' sobre ' + base['ref']) if base['ref'] else '', base['client_text'], base['client_phone_pretty'])
                 try:
                     forwarded = Msg.queue(phone=fallback, body=text, res_model='whatsapp.message', res_id=message.id)
                 except Exception as e:  # noqa: BLE001

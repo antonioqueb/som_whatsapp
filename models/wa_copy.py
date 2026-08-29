@@ -28,9 +28,9 @@ Renuévala o conviértela en venta; al vencer, el material se libera.
 INBOUND_AUTOREPLY = """{{ ctx.get('notice') }} Su mensaje fue turnado a su asesor.
 {{ ctx.get('seller_block') }}"""
 
-INBOUND_FORWARD = """📨 Mensaje del cliente *{{ ctx.get('client') or 'Desconocido' }}* (+{{ ctx.get('client_phone') }}){{ ctx.get('ref') and (' sobre ' + ctx.get('ref')) or '' }}:
+INBOUND_FORWARD = """📨 Mensaje del cliente *{{ ctx.get('client') or 'Desconocido' }}*{{ ctx.get('ref') and (' sobre ' + ctx.get('ref')) or '' }}:
 "{{ ctx.get('client_text') }}"
-Ya se le indicó que el seguimiento es contigo. Responder: {{ ctx.get('client_link') }}"""
+Ya se le indicó que el seguimiento es contigo. Su número: {{ ctx.get('client_phone_pretty') }}"""
 
 BY_XMLID = {
     'som_whatsapp.wa_template_sale_confirmed': SALE_CONFIRMED,
