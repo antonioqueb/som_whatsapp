@@ -131,7 +131,7 @@ class WhatsappEvent(models.Model):
         return out
 
     # ── contexto común para TODAS las plantillas ──
-    DEFAULT_NOTICE = 'Este número es exclusivo para notificaciones automáticas y no es atendido.'
+    DEFAULT_NOTICE = 'Este número es solo para notificaciones automáticas y no se atiende.'
 
     @api.model
     def _wa_link(self, phone, text=''):
@@ -195,6 +195,12 @@ class WhatsappEvent(models.Model):
             seller_contact = '*%s*' % seller_name
         else:
             seller_contact = 'un asesor de %s' % (record.company_id.name if getattr(record, 'company_id', False) else 'SOM')
+        if seller_name and seller_phone:
+            seller_followup = 'Su asesor *%s* se pondrá en contacto con usted lo antes posible: %s' % (seller_name, self._wa_pretty_phone(seller_phone))
+        elif seller_name:
+            seller_followup = 'Su asesor *%s* se pondrá en contacto con usted lo antes posible.' % seller_name
+        else:
+            seller_followup = 'Un asesor se pondrá en contacto con usted lo antes posible.'
         job = ''
         for f in ('x_project_id', 'project_id'):
             v = getattr(record, f, False)
@@ -213,6 +219,7 @@ class WhatsappEvent(models.Model):
             'seller_link': seller_link,
             'seller_block': seller_block,
             'seller_contact': seller_contact,
+            'seller_followup': seller_followup,
             'notice': P.get_param('som_whatsapp.notice_text') or self.DEFAULT_NOTICE,
             'job': job or '—',
             'job_suffix': (' del proyecto *%s*' % job) if job else '',

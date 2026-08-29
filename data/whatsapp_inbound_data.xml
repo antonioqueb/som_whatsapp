@@ -2,8 +2,8 @@
     <record id="wa_template_inbound_autoreply" model="whatsapp.template">
         <field name="name">Entrante · auto-respuesta al cliente</field>
         <field name="model_id" ref="som_whatsapp.model_whatsapp_message"/>
-        <field name="body">{{ ctx.get('notice') }} Su mensaje fue turnado a su asesor.
-{{ ctx.get('seller_block') }}</field>
+        <field name="body">{{ ctx.get('notice') }}
+{{ ctx.get('seller_followup') }}</field>
     </record>
     <record id="wa_template_inbound_forward" model="whatsapp.template">
         <field name="name">Entrante · reenvío al asesor</field>

@@ -25,8 +25,8 @@ Cliente: {{ ctx.get('client') }} · Job: {{ ctx.get('job') }}
 Renuévala o conviértela en venta; al vencer, el material se libera.
 🔗 {{ ctx.get('link') }}"""
 
-INBOUND_AUTOREPLY = """{{ ctx.get('notice') }} Su mensaje fue turnado a su asesor.
-{{ ctx.get('seller_block') }}"""
+INBOUND_AUTOREPLY = """{{ ctx.get('notice') }}
+{{ ctx.get('seller_followup') }}"""
 
 INBOUND_FORWARD = """📨 El cliente *{{ ctx.get('client') or 'Desconocido' }}*{{ ctx.get('ref') and (' sobre ' + ctx.get('ref')) or '' }} envió:
 {{ ctx.get('client_text_line') }}
