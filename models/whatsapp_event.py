@@ -142,6 +142,14 @@ class WhatsappEvent(models.Model):
         return 'https://wa.me/%s%s' % (phone, ('?text=' + quote(text)) if text else '')
 
     @api.model
+    def _wa_pretty_phone(self, digits):
+        """'528114147155' → '+52 811 414 7155'; otros países → '+<dígitos>'."""
+        d = ''.join(ch for ch in (digits or '') if ch.isdigit())
+        if d.startswith('52') and len(d) == 12:
+            return '+52 %s %s %s' % (d[2:5], d[5:8], d[8:])
+        return ('+' + d) if d else ''
+
+    @api.model
     def _wa_seller_partner(self, record):
         """Asesor responsable del registro: user_id (venta, reserva…),
         seller_partner_id (mensajes entrantes) o el vendedor del contacto."""
@@ -175,8 +183,8 @@ class WhatsappEvent(models.Model):
         seller_phone = GW.normalize_phone(seller_partner.phone or '') if seller_partner else ''
         seller_name = seller_partner.name or '' if seller_partner else ''
         seller_link = self._wa_link(seller_phone, ('Hola, le escribo por %s.' % ref) if ref else 'Hola, le escribo para dar seguimiento.') if seller_phone else ''
-        if seller_name and seller_link:
-            seller_block = 'Seguimiento y pagos con su asesor *%s*: %s' % (seller_name, seller_link)
+        if seller_name and seller_phone:
+            seller_block = 'Seguimiento y pagos con su asesor *%s*: %s' % (seller_name, self._wa_pretty_phone(seller_phone))
         elif seller_name:
             seller_block = 'Su asesor *%s* le dará seguimiento.' % seller_name
         else:
@@ -194,6 +202,7 @@ class WhatsappEvent(models.Model):
             'client_link': self._wa_link(client_phone) if client_phone else '',
             'seller': seller_name,
             'seller_phone': seller_phone,
+            'seller_phone_pretty': self._wa_pretty_phone(seller_phone),
             'seller_link': seller_link,
             'seller_block': seller_block,
             'notice': P.get_param('som_whatsapp.notice_text') or self.DEFAULT_NOTICE,
