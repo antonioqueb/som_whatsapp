@@ -72,6 +72,17 @@ class StockLotHoldOrder(models.Model):
             return ''
         return '\n'.join(rows) + '\n*Total: %d placa(s) · %.2f m²*' % (placas, m2)
 
+    def _wa_lines_compact(self):
+        """Una línea por producto, sin números de lote (para el aviso interno)."""
+        self.ensure_one()
+        rows = []
+        for line in self.hold_line_ids:
+            if line.product_id.type == 'service':
+                continue
+            n = len(line.lot_ids)
+            rows.append('• %s — %d placa%s · %.2f m²' % (line.x_mask_name or line.product_id.display_name, n, '' if n == 1 else 's', line.cantidad_m2 or 0.0))
+        return '\n'.join(rows)
+
     def _wa_lines_short(self):
         """Una línea: '3 productos · 22 placas · 105.14 m²'."""
         self.ensure_one()
@@ -101,6 +112,7 @@ class StockLotHoldOrder(models.Model):
             'expiry_time': exp.strftime('%H:%M') if exp else '',
             'lines': self._wa_lines_text(),
             'lines_short': self._wa_lines_short(),
+            'lines_compact': self._wa_lines_compact(),
             'link': self._wa_link(),
         }
 
@@ -131,48 +143,37 @@ class StockLotHoldOrder(models.Model):
 
     @api.model
     def _cron_wa_hold_notices(self):
-        """Cada hora. Solo actúa a partir de la hora matutina configurada.
-        Vendedor: T-2 (vence en 2 días) y T-0 (vence hoy).
-        Cliente: la mañana del día que vence; si vence demasiado temprano,
-        la mañana del día anterior. Solo si el cliente tiene teléfono."""
+        """Cada hora. UN solo aviso automático por reserva, el DÍA del vencimiento:
+        al vendedor (interno) y al cliente (con el contacto directo de su asesor).
+        Sale a partir de la hora matutina configurada, o antes si el vencimiento
+        está a menos de 3 h. Los envíos se escalonan (anti-ráfaga)."""
+        from datetime import timedelta
         P = self.env['ir.config_parameter'].sudo()
         try:
             morning = int(P.get_param('som_whatsapp_holds.morning_hour', '9') or 9)
         except ValueError:
             morning = 9
-        try:
-            min_hours = int(P.get_param('som_whatsapp_holds.client_min_hours', '3') or 3)
-        except ValueError:
-            min_hours = 3
         now_utc = fields.Datetime.now()
         now_local = pytz.utc.localize(now_utc).astimezone(pytz.timezone(TZ))
-        if now_local.hour < morning:
-            return
         today = now_local.date()
         orders = self.sudo().search([
             ('state', '=', 'confirmed'),
             ('fecha_expiracion', '>', now_utc),
+            ('fecha_expiracion', '<', now_utc + timedelta(hours=30)),
         ])
         for order in orders:
             try:
                 exp = order._wa_local_expiry()
-                days = (exp.date() - today).days
-                seller_phone = order.user_id.partner_id.phone or ''
-                seller_who = 'el vendedor %s' % (order.user_id.name or '')
-                # Vendedor T-2 (si el cron no corrió ese día, alcanza en T-1)
-                if not order.x_wa_seller_t2_sent and days in (1, 2):
-                    order._wa_fire_stage(KEY_SELLER_T2, 'x_wa_seller_t2_sent', seller_phone, seller_who,
-                                         'en 2 días' if days == 2 else 'mañana')
-                # Vendedor día del vencimiento
-                if not order.x_wa_seller_t0_sent and days == 0:
-                    order._wa_fire_stage(KEY_SELLER_T0, 'x_wa_seller_t0_sent', seller_phone, seller_who, 'HOY')
-                # Cliente: mañana del vencimiento, o la anterior si vence temprano
+                if exp.date() != today:
+                    continue
+                if now_local.hour < morning and (exp - now_local) > timedelta(hours=3):
+                    continue
+                if not order.x_wa_seller_t0_sent:
+                    order._wa_fire_stage(KEY_SELLER_T0, 'x_wa_seller_t0_sent', order.user_id.partner_id.phone or '',
+                                         'el vendedor %s' % (order.user_id.name or ''), 'HOY')
                 if not order.x_wa_client_sent:
-                    early = exp.hour < (morning + min_hours)
-                    if days == 0 or (days == 1 and early):
-                        order._wa_fire_stage(KEY_CLIENT, 'x_wa_client_sent', order.partner_id.phone or '',
-                                             'el cliente %s' % (order.partner_id.display_name or ''),
-                                             'hoy' if days == 0 else 'mañana')
+                    order._wa_fire_stage(KEY_CLIENT, 'x_wa_client_sent', order.partner_id.phone or '',
+                                         'el cliente %s' % (order.partner_id.display_name or ''), 'hoy')
                 self.env.cr.commit()  # cada reserva cierra su propia transacción
             except Exception:  # noqa: BLE001
                 _logger.exception('[WA HOLD] aviso fallido para %s', order.name)

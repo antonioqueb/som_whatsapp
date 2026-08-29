@@ -2,38 +2,57 @@
     <record id="wa_template_hold_seller_t2" model="whatsapp.template">
         <field name="name">Reserva · vendedor · vence en 2 días</field>
         <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
-        <field name="body">🔒 Aviso interno · *Reserva {{ object.name }} vence {{ ctx.get('when') }}* ({{ ctx.get('expiry') }})
-Cliente: *{{ ctx.get('client') }}*{{ ctx.get('client_phone_pretty') and (' · ' + ctx.get('client_phone_pretty')) or '' }} · Job: {{ ctx.get('job') }}
-{{ ctx.get('lines') }}
-Al vencer, otro vendedor puede tomarlas. Contacta al cliente para renovar o convertir en venta.</field>
+        <field name="body">🔒 Aviso interno · Reserva *{{ object.name }}* vence {{ ctx.get('when') }} ({{ ctx.get('expiry') }})
+
+Cliente: *{{ ctx.get('client') }}*{{ ctx.get('client_phone_pretty') and (' · ' + ctx.get('client_phone_pretty')) or '' }}
+Job: {{ ctx.get('job') }}
+
+{{ ctx.get('lines_compact') }}
+
+Contacta al cliente para renovar o convertir en venta.</field>
     </record>
     <record id="wa_template_hold_seller_t0" model="whatsapp.template">
         <field name="name">Reserva · vendedor · vence hoy</field>
         <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
-        <field name="body">🔒 Aviso interno · *Reserva {{ object.name }} vence HOY a las {{ ctx.get('expiry_time') }}*
-Cliente: *{{ ctx.get('client') }}*{{ ctx.get('client_phone_pretty') and (' · ' + ctx.get('client_phone_pretty')) or '' }} · Job: {{ ctx.get('job') }}
-{{ ctx.get('lines') }}
+        <field name="body">🔒 Aviso interno · Reserva *{{ object.name }}* vence *hoy a las {{ ctx.get('expiry_time') }}*
+
+Cliente: *{{ ctx.get('client') }}*{{ ctx.get('client_phone_pretty') and (' · ' + ctx.get('client_phone_pretty')) or '' }}
+Job: {{ ctx.get('job') }}
+
+{{ ctx.get('lines_compact') }}
+
 Al vencer, el material se libera. Contacta al cliente hoy para renovar o convertir en venta.</field>
     </record>
     <record id="wa_template_hold_client" model="whatsapp.template">
         <field name="name">Reserva · cliente · vence hoy/mañana</field>
         <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
         <field name="body">{Hola|Buen día|Qué tal} {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
-Su reserva *{{ object.name }}* ({{ ctx.get('lines_short') }}) vence {{ ctx.get('when') }} a las {{ ctx.get('expiry_time') }}. {Son piezas únicas|Se trata de piezas únicas|Cada placa es única}: al vencer {quedan libres para otro cliente|se liberan para cualquier otro cliente} y no podemos reponerlas.
-Para extenderla o confirmar su pedido, su asesor {{ ctx.get('seller_contact') }}.</field>
+
+Su reserva *{{ object.name }}* vence *hoy a las {{ ctx.get('expiry_time') }}*.
+{{ ctx.get('lines_short') }}
+
+{Son piezas únicas|Se trata de piezas únicas}: al vencer quedan libres para otro cliente.
+
+Para extender o confirmar, {{ ctx.get('followup_contact') }}</field>
     </record>
 
     <record id="wa_template_hold_document" model="whatsapp.template">
         <field name="name">Reserva · cliente · documento (envío manual)</field>
         <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
         <field name="body">{Hola|Buen día|Qué tal} {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
-{Le compartimos|Le enviamos|Adjuntamos} el documento de su reserva *{{ object.name }}* ({{ ctx.get('lines_short') }}), apartada solo hasta el {{ ctx.get('expiry') }} hora de Monterrey. Son piezas únicas: después de esa fecha quedan libres para otro cliente.
-Para confirmar o extender, su asesor {{ ctx.get('seller_contact') }}.</field>
+
+{Le compartimos|Le enviamos|Adjuntamos} el documento de su reserva *{{ object.name }}*.
+{{ ctx.get('lines_short') }} · apartada hasta el {{ ctx.get('expiry') }}.
+
+Son piezas únicas: después de esa fecha quedan libres para otro cliente.
+
+Para confirmar o extender, {{ ctx.get('followup_contact') }}</field>
     </record>
 
     <record id="wa_event_hold_seller_t2" model="whatsapp.event">
         <field name="name">Reserva vence en 2 días → vendedor</field>
         <field name="key">hold.seller_t2</field>
+        <field name="active" eval="False"/>
         <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
         <field name="template_id" ref="wa_template_hold_seller_t2"/>
         <field name="recipient_mode">partner_field</field>

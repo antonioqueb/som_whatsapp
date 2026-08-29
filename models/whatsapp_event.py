@@ -191,11 +191,13 @@ class WhatsappEvent(models.Model):
         else:
             seller_block = 'Un asesor le dará seguimiento.'
         if seller_name and seller_phone:
-            seller_contact = '*%s*: %s' % (seller_name, self._wa_pretty_phone(seller_phone))
+            seller_contact = '*%s* · %s' % (seller_name, self._wa_pretty_phone(seller_phone))
         elif seller_name:
             seller_contact = '*%s*' % seller_name
         else:
             seller_contact = 'un asesor de %s' % (record.company_id.name if getattr(record, 'company_id', False) else 'SOM')
+        # 'contacte a su asesor:\n*NOMBRE* · +52 …'  (o 'respóndame por aquí.' si sale del propio vendedor)
+        followup_contact = 'contacte a su asesor:\n%s' % seller_contact
         if seller_name and seller_phone:
             seller_followup = 'Su asesor *%s* se pondrá en contacto con usted lo antes posible: %s' % (seller_name, self._wa_pretty_phone(seller_phone))
         elif seller_name:
@@ -208,6 +210,7 @@ class WhatsappEvent(models.Model):
             seller_block = 'Cualquier duda, respóndame por aquí.'
             seller_contact = 'un servidor, por este mismo número'
             seller_followup = 'Le doy seguimiento por este mismo número.'
+            followup_contact = 'respóndame por aquí.'
         job = ''
         for f in ('x_project_id', 'project_id'):
             v = getattr(record, f, False)
@@ -226,6 +229,7 @@ class WhatsappEvent(models.Model):
             'seller_link': seller_link,
             'seller_block': seller_block,
             'seller_contact': seller_contact,
+            'followup_contact': followup_contact,
             'seller_followup': seller_followup,
             'from_seller': from_seller,
             'notice': P.get_param('som_whatsapp.notice_text') or self.DEFAULT_NOTICE,
