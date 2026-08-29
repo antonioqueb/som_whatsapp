@@ -18,7 +18,6 @@ en el modelo destino, o llamando fire() desde la lógica del proceso.
 import logging
 
 from odoo import models, fields, api, _
-from odoo.osv import expression
 from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
