@@ -1,0 +1,76 @@
+<odoo noupdate="1">
+    <record id="wa_template_hold_seller_t2" model="whatsapp.template">
+        <field name="name">Reserva · vendedor · vence en 2 días</field>
+        <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
+        <field name="body">⏳ *Reserva por vencer {{ ctx.get('when') }}*
+
+📋 Reserva: *{{ object.name }}*
+👤 Cliente: {{ ctx.get('client') }}
+🏗️ Job name: {{ ctx.get('job') }}
+📅 Vence: {{ ctx.get('expiry') }} (hora de Monterrey)
+
+{{ ctx.get('lines') }}
+
+Renuévala o conviértela en venta antes del vencimiento; al vencer, las placas quedan liberadas para cualquier otro vendedor.
+🔗 {{ ctx.get('link') }}</field>
+    </record>
+    <record id="wa_template_hold_seller_t0" model="whatsapp.template">
+        <field name="name">Reserva · vendedor · vence hoy</field>
+        <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
+        <field name="body">⚠️ *Tu reserva vence HOY a las {{ ctx.get('expiry_time') }}*
+
+📋 Reserva: *{{ object.name }}*
+👤 Cliente: {{ ctx.get('client') }}
+🏗️ Job name: {{ ctx.get('job') }}
+📅 Vence: {{ ctx.get('expiry') }} (hora de Monterrey)
+
+{{ ctx.get('lines') }}
+
+Si el cliente sigue interesado, renuévala o conviértela en venta ahora. Al vencer, el material se libera al inventario.
+🔗 {{ ctx.get('link') }}</field>
+    </record>
+    <record id="wa_template_hold_client" model="whatsapp.template">
+        <field name="name">Reserva · cliente · vence hoy/mañana</field>
+        <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
+        <field name="body">Hola {{ object.partner_id.name }}, le saluda {{ ctx.get('seller') }} de {{ object.company_id.name }}.
+
+Su reserva *{{ object.name }}*{{ ctx.get('job_suffix') }} vence *{{ ctx.get('when') }}* ({{ ctx.get('expiry') }}, hora de Monterrey).
+
+{{ ctx.get('lines') }}
+
+Gran parte de nuestro material son piezas únicas: al vencer la reserva quedan disponibles de inmediato para cualquier otro cliente y no podemos garantizar piezas equivalentes después.
+
+Si desea extenderla o confirmar su pedido, respóndame por este medio{{ ctx.get('seller_phone_suffix') }}.</field>
+    </record>
+
+    <record id="wa_event_hold_seller_t2" model="whatsapp.event">
+        <field name="name">Reserva vence en 2 días → vendedor</field>
+        <field name="key">hold.seller_t2</field>
+        <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
+        <field name="template_id" ref="wa_template_hold_seller_t2"/>
+        <field name="recipient_mode">partner_field</field>
+        <field name="recipient_path">user_id.partner_id</field>
+        <field name="trigger">manual</field>
+        <field name="notes">Lo dispara el cron "WhatsApp: avisos de reservas" la mañana de T-2 (Ajustes › WhatsApp › hora de envío).</field>
+    </record>
+    <record id="wa_event_hold_seller_t0" model="whatsapp.event">
+        <field name="name">Reserva vence hoy → vendedor</field>
+        <field name="key">hold.seller_t0</field>
+        <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
+        <field name="template_id" ref="wa_template_hold_seller_t0"/>
+        <field name="recipient_mode">partner_field</field>
+        <field name="recipient_path">user_id.partner_id</field>
+        <field name="trigger">manual</field>
+        <field name="notes">Lo dispara el cron la mañana del día del vencimiento.</field>
+    </record>
+    <record id="wa_event_hold_client" model="whatsapp.event">
+        <field name="name">Reserva por vencer → cliente</field>
+        <field name="key">hold.client_expiry</field>
+        <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
+        <field name="template_id" ref="wa_template_hold_client"/>
+        <field name="recipient_mode">partner_field</field>
+        <field name="recipient_path">partner_id</field>
+        <field name="trigger">manual</field>
+        <field name="notes">Lo dispara el cron la mañana del vencimiento (o la anterior si vence temprano). Solo si el cliente tiene teléfono.</field>
+    </record>
+</odoo>

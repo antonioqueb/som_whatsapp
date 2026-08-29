@@ -31,6 +31,16 @@
                             </div>
                         </setting>
                     </block>
+                    <block title="Reservas (holds)" name="whatsapp_holds_block">
+                        <setting string="Avisos de vencimiento" help="Vendedor: 2 días antes y el día del vencimiento. Cliente: la mañana del vencimiento (solo si tiene teléfono).">
+                            <div class="row mt8">
+                                <label for="wa_hold_morning_hour" class="col-lg-6 o_light_label"/><field name="wa_hold_morning_hour"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="wa_hold_client_min_hours" class="col-lg-6 o_light_label"/><field name="wa_hold_client_min_hours"/>
+                            </div>
+                        </setting>
+                    </block>
                 </app>
             </xpath>
         </field>

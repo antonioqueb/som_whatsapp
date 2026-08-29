@@ -1,0 +1,35 @@
+<odoo>
+    <record id="view_hold_order_form_whatsapp" model="ir.ui.view">
+        <field name="name">stock.lot.hold.order.form.whatsapp</field>
+        <field name="model">stock.lot.hold.order</field>
+        <field name="inherit_id" ref="stock_lot_dimensions.view_stock_lot_hold_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@string='Notas']" position="after">
+                <page string="WhatsApp" groups="som_whatsapp.group_whatsapp_user">
+                    <group>
+                        <group string="Avisos automáticos enviados">
+                            <field name="x_wa_seller_t2_sent" readonly="1"/>
+                            <field name="x_wa_seller_t0_sent" readonly="1"/>
+                            <field name="x_wa_client_sent" readonly="1"/>
+                        </group>
+                        <group string="Teléfonos">
+                            <field name="x_partner_phone"/>
+                        </group>
+                    </group>
+                    <div class="text-muted">
+                        Vendedor: 2 días antes y el día del vencimiento. Cliente: la mañana del vencimiento, solo si tiene teléfono.
+                        Renovar la reserva re-arma los avisos.
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+    <record id="action_whatsapp_compose_hold" model="ir.actions.act_window">
+        <field name="name">Enviar WhatsApp</field>
+        <field name="res_model">whatsapp.compose</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
+        <field name="binding_view_types">form</field>
+    </record>
+</odoo>

@@ -26,3 +26,8 @@ Endpoints: `GET /health`, `POST /sessions/:id/start`, `GET /sessions/:id/status`
 - Enganchar procesos: confirmación de venta, apartado, autorización de precios, entregas, cobranza (semáforo), incidencias.
 - Ruteo de entrantes: `whatsapp.event._on_inbound(msg)` (respuestas automáticas, asignar a vendedor).
 - Multi-cuenta por equipo/sucursal (`whatsapp.event.account_id`).
+
+## Reservas (holds) — integrado
+- Vendedor: WhatsApp 2 días antes (`hold.seller_t2`) y el día del vencimiento (`hold.seller_t0`), con job name, cliente, folio, material y liga.
+- Cliente: la mañana del vencimiento (`hold.client_expiry`), o la anterior si vence temprano; solo si tiene teléfono.
+- Cron horario `WhatsApp: avisos de reservas`; hora de envío en Ajustes › WhatsApp › Reservas. Renovar re-arma los avisos.
