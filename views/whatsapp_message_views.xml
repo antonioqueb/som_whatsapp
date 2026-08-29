@@ -7,6 +7,7 @@
                 <field name="create_date" string="Fecha"/>
                 <field name="direction" widget="badge" decoration-info="direction == 'in'" decoration-success="direction == 'out'"/>
                 <field name="account_id" optional="show"/>
+                <field name="from_seller" optional="show" string="Tel. vendedor"/>
                 <field name="partner_id"/>
                 <field name="phone"/>
                 <field name="body"/>

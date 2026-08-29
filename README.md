@@ -40,3 +40,8 @@ Endpoints: `GET /health`, `POST /sessions/:id/start`, `GET /sessions/:id/status`
 
 ## Anti-baneo (Ajustes › WhatsApp › Anti-baneo)
 Goteo con jitter y "escribiendo…", tope diario con rampa de calentamiento por cuenta, ventana horaria (domingo solo urgentes), avisos de reservas escalonados, variantes de texto `{a|b}`, baja inmediata (BAJA/STOP → lista de baja), detector de bloqueos (pausa la cuenta y avisa), failover automático a otra cuenta conectada.
+
+## Teléfonos de vendedores (19.0.1.10.0)
+- `whatsapp.account.user_id`: cuenta ligada a un vendedor (menú WhatsApp › Mi WhatsApp crea la suya y muestra el QR). `res.users.wa_connected` = vinculado y operativo.
+- Ruteo (`whatsapp.account.for_record`): lo del vendedor sale de su teléfono si está conectado; si no, del genérico (`get_default_account` solo devuelve genéricas). `ctx.from_seller` cambia el bloque de asesor por "respóndame por aquí"; si un mensaje del vendedor cae al genérico por failover, se le añade el bloque de asesor.
+- Entrantes en teléfono de vendedor: solo de clientes conocidos (contacto o envío previo en 90 días); sin auto-respuesta ni reenvío; rastro + archivo en la orden. Lo demás se descarta sin guardarse. El gateway no marca leídos en esas sesiones (`mark_read=false`).

@@ -99,7 +99,7 @@ class WhatsappEvent(models.Model):
         return bool(record.filtered_domain(dom))
 
     @api.model
-    def fire(self, key, records, extra_ctx=None, force=False):
+    def fire(self, key, records, extra_ctx=None, force=False, account=None):
         """Dispara el evento `key` para `records`. Devuelve los mensajes encolados."""
         Msg = self.env['whatsapp.message'].sudo()
         events = self.sudo().search([('key', '=', key), ('active', '=', True)])
@@ -110,7 +110,8 @@ class WhatsappEvent(models.Model):
                     continue
                 if not force and not ev._matches(record):
                     continue
-                ctx = self._wa_base_ctx(record)
+                acc = account or ev.account_id or self.env['whatsapp.account'].for_record(record)
+                ctx = self._wa_base_ctx(record, account=acc)
                 ctx.update(extra_ctx or {})
                 body = ev.template_id.render_for(record, ctx)
                 attachment = None
@@ -123,7 +124,7 @@ class WhatsappEvent(models.Model):
                         continue
                     try:
                         out |= Msg.queue(phone=phone, body=body, partner=partner or None,
-                                         account=ev.account_id or None, attachment=attachment,
+                                         account=acc or None, attachment=attachment,
                                          res_model=record._name, res_id=record.id,
                                          event=ev, template=ev.template_id, send_now=ev.send_now)
                     except Exception as e:  # noqa: BLE001
@@ -164,7 +165,7 @@ class WhatsappEvent(models.Model):
         return self.env['res.partner']
 
     @api.model
-    def _wa_base_ctx(self, record):
+    def _wa_base_ctx(self, record, account=None):
         """Claves disponibles en cualquier plantilla vía ctx: client, client_phone,
         client_link, seller, seller_phone, seller_link, seller_block, notice, ref, job_suffix."""
         P = self.env['ir.config_parameter'].sudo()
@@ -201,6 +202,12 @@ class WhatsappEvent(models.Model):
             seller_followup = 'Su asesor *%s* se pondrá en contacto con usted lo antes posible.' % seller_name
         else:
             seller_followup = 'Un asesor se pondrá en contacto con usted lo antes posible.'
+        from_seller = bool(account and account.user_id)
+        if from_seller:
+            # Sale del teléfono del propio vendedor: el cliente responde ahí mismo.
+            seller_block = 'Cualquier duda, respóndame por aquí.'
+            seller_contact = 'un servidor, por este mismo número'
+            seller_followup = 'Le doy seguimiento por este mismo número.'
         job = ''
         for f in ('x_project_id', 'project_id'):
             v = getattr(record, f, False)
@@ -220,16 +227,17 @@ class WhatsappEvent(models.Model):
             'seller_block': seller_block,
             'seller_contact': seller_contact,
             'seller_followup': seller_followup,
+            'from_seller': from_seller,
             'notice': P.get_param('som_whatsapp.notice_text') or self.DEFAULT_NOTICE,
             'job': job or '—',
             'job_suffix': (' del proyecto *%s*' % job) if job else '',
         }
 
     @api.model
-    def render_template(self, template, record, extra_ctx=None):
+    def render_template(self, template, record, extra_ctx=None, account=None):
         """Texto final con el contexto completo (base + el del modelo, si define
         `_wa_ctx`). Lo usa el compositor manual."""
-        ctx = self._wa_base_ctx(record)
+        ctx = self._wa_base_ctx(record, account=account)
         if hasattr(record, '_wa_ctx'):
             ctx.update(record._wa_ctx())
         ctx.update(extra_ctx or {})
@@ -268,7 +276,7 @@ class WhatsappEvent(models.Model):
             self.env['whatsapp.blocklist'].block(message.phone, message.partner_id, 'Pidió baja por WhatsApp', message.body)
             try:
                 Msg.with_context(wa_skip_blocklist=True).queue(
-                    phone=message.phone, body='Entendido, no recibirá más mensajes de este número.',
+                    phone=message.phone, body='Entendido, no recibirá más mensajes de este número.', account=message.account_id or None,
                     partner=None, res_model='whatsapp.message', res_id=message.id, send_now=True)
             except Exception as e:  # noqa: BLE001
                 _logger.warning('[WHATSAPP] confirmación de baja no enviada: %s', e)
@@ -276,7 +284,7 @@ class WhatsappEvent(models.Model):
             message.write({'seller_partner_id': seller.id if seller else False})
             if seller and seller.phone:
                 try:
-                    Msg.queue(phone=seller.phone, partner=seller, res_model='whatsapp.message', res_id=message.id, send_now=True,
+                    Msg.queue(phone=seller.phone, partner=seller, res_model='whatsapp.message', res_id=message.id, send_now=True, account=message.account_id or None,
                               body='🚫 El cliente *%s* (%s) pidió NO recibir WhatsApp de la cuenta de avisos. Cualquier contacto va por tu número.' % (
                                   message.partner_id.display_name or message.pushname or 'Desconocido', self._wa_pretty_phone(message.phone)))
                 except Exception as e:  # noqa: BLE001
@@ -332,15 +340,15 @@ class WhatsappEvent(models.Model):
             try:
                 is_audio = bool(att) and (att.mimetype or '').startswith('audio/')
                 if att and not is_audio:
-                    forwarded = Msg.queue(phone=to_phone, body=text, partner=seller if (seller and seller.phone) else None,
+                    forwarded = Msg.queue(phone=to_phone, body=text, partner=seller if (seller and seller.phone) else None, account=message.account_id or None,
                                           attachment=att, res_model='whatsapp.message', res_id=message.id,
                                           event=fw_ev, template=fw_ev.template_id, send_now=True)
                 else:
-                    forwarded = Msg.queue(phone=to_phone, body=text, partner=seller if (seller and seller.phone) else None,
+                    forwarded = Msg.queue(phone=to_phone, body=text, partner=seller if (seller and seller.phone) else None, account=message.account_id or None,
                                           res_model='whatsapp.message', res_id=message.id,
                                           event=fw_ev, template=fw_ev.template_id, send_now=True)
                     if att:
-                        Msg.queue(phone=to_phone, body='', partner=seller if (seller and seller.phone) else None,
+                        Msg.queue(phone=to_phone, body='', partner=seller if (seller and seller.phone) else None, account=message.account_id or None,
                                   attachment=att, res_model='whatsapp.message', res_id=message.id, send_now=True)
             except Exception as e:  # noqa: BLE001
                 _logger.warning('[WHATSAPP] reenvío al asesor no encolado: %s', e)
@@ -356,7 +364,7 @@ class WhatsappEvent(models.Model):
         recent = Msg.search_count([('direction', '=', 'out'), ('phone', '=', message.phone), ('event_id', '=', ev.id),
                                    ('create_date', '>=', fields.Datetime.now() - timedelta(hours=hours))]) if ev else 0
         if not recent:
-            self.fire('inbound.client_autoreply', message, extra_ctx=ctx)
+            self.fire('inbound.client_autoreply', message, extra_ctx=ctx, account=message.account_id or None)
         return True
 
     def action_test_send(self):

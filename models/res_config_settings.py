@@ -21,6 +21,8 @@ class ResConfigSettings(models.TransientModel):
     wa_fallback_forward_phone = fields.Char(
         string='Número de respaldo (sin asesor)', config_parameter='som_whatsapp.fallback_forward_phone',
         help='Si un cliente escribe y no se identifica asesor, el mensaje se reenvía aquí (p. ej. gerencia de ventas).')
+    wa_seller_accounts = fields.Boolean(string='Teléfonos de vendedores', config_parameter='som_whatsapp.seller_accounts', default=True,
+                                        help='Cada vendedor puede vincular su teléfono (WhatsApp › Mi WhatsApp). Lo suyo sale desde su número; si no está conectado, sale del genérico.')
     wa_max_per_minute = fields.Integer(string='Máximo por minuto', config_parameter='som_whatsapp.max_per_minute', default=5)
     wa_jitter_min = fields.Integer(string='Pausa mínima entre mensajes (s)', config_parameter='som_whatsapp.jitter_min', default=6)
     wa_jitter_max = fields.Integer(string='Pausa máxima entre mensajes (s)', config_parameter='som_whatsapp.jitter_max', default=14)

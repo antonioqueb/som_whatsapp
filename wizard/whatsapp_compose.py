@@ -13,7 +13,8 @@ class WhatsappCompose(models.TransientModel):
     res_id = fields.Integer()
     partner_id = fields.Many2one('res.partner', string='Contacto')
     phone = fields.Char(string='Teléfono', required=True)
-    account_id = fields.Many2one('whatsapp.account', string='Cuenta', default=lambda self: self.env['whatsapp.account'].get_default_account())
+    account_id = fields.Many2one('whatsapp.account', string='Sale desde', default=lambda self: self.env['whatsapp.account'].get_default_account(),
+                                 domain="[('state', '=', 'connected'), ('paused', '=', False)]")
     template_id = fields.Many2one('whatsapp.template', string='Plantilla')
     body = fields.Text(string='Mensaje', required=True)
     attachment_ids = fields.Many2many('ir.attachment', string='Adjuntos')
@@ -47,6 +48,9 @@ class WhatsappCompose(models.TransientModel):
         if model and rid:
             rec = self.env[model].browse(rid)
             res.update({'res_model': model, 'res_id': rid})
+            acc = self.env['whatsapp.account'].for_record(rec) if rec.exists() else self.env['whatsapp.account']
+            if acc:
+                res['account_id'] = acc.id
             partner = rec if model == 'res.partner' else getattr(rec, 'partner_id', False)
             if partner:
                 res['partner_id'] = partner.id
@@ -58,7 +62,7 @@ class WhatsappCompose(models.TransientModel):
             tpl = self.env.ref(ctx.get('wa_template_xmlid') or self.DEFAULT_TEMPLATES.get(model, ''), raise_if_not_found=False)
             if tpl and tpl._name == 'whatsapp.template' and tpl.model_id.model == model and rec.exists():
                 res['template_id'] = tpl.id
-                res['body'] = self.env['whatsapp.event'].render_template(tpl, rec)
+                res['body'] = self.env['whatsapp.event'].render_template(tpl, rec, account=self.env['whatsapp.account'].browse(res.get('account_id')) if res.get('account_id') else None)
         return res
 
     @api.onchange('partner_id')
@@ -66,12 +70,12 @@ class WhatsappCompose(models.TransientModel):
         if self.partner_id and not self.phone:
             self.phone = self.partner_id.phone or ''
 
-    @api.onchange('template_id')
+    @api.onchange('template_id', 'account_id')
     def _onchange_template(self):
         if self.template_id and self.res_model and self.res_id:
             rec = self.env[self.res_model].browse(self.res_id)
             if rec.exists() and self.template_id.model_id.model == self.res_model:
-                self.body = self.env['whatsapp.event'].render_template(self.template_id, rec)
+                self.body = self.env['whatsapp.event'].render_template(self.template_id, rec, account=self.account_id or None)
 
     def action_send(self):
         self.ensure_one()

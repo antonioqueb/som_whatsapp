@@ -45,6 +45,7 @@ class WhatsappMessage(models.Model):
     pushname = fields.Char(string='Nombre en WhatsApp', help='Nombre que el remitente muestra en WhatsApp (entrantes).')
     priority = fields.Integer(default=5, help='9 = urgente (vencimientos del día); se envía primero y también en domingo.')
     scheduled_at = fields.Datetime(string='No antes de', help='Escalonado anti-ráfaga: la cola no lo manda antes de esta hora.')
+    from_seller = fields.Boolean(string='Desde teléfono del vendedor', help='Salió (o entró) por la cuenta propia de un vendedor.')
     seller_partner_id = fields.Many2one('res.partner', string='Vendedor (seguimiento)', index=True,
                                         help='Entrantes: asesor al que se reenvió el mensaje del cliente.')
     retry_count = fields.Integer(default=0)
@@ -70,7 +71,11 @@ class WhatsappMessage(models.Model):
             raise UserError(_('%s pidió no recibir WhatsApp.') % partner.display_name)
         if not self.env.context.get('wa_skip_blocklist') and self.env['whatsapp.blocklist'].is_blocked(phone):
             raise UserError(_('El número %s pidió no recibir WhatsApp de esta cuenta.') % phone)
-        account = account or self.env['whatsapp.account'].get_default_account()
+        if not account:
+            origin = None
+            if res_model and res_id and res_model in self.env and res_model != self._name:
+                origin = self.env[res_model].sudo().browse(res_id).exists()
+            account = self.env['whatsapp.account'].for_record(origin) if origin else self.env['whatsapp.account'].get_default_account()
         att = attachment
         if isinstance(attachment, tuple):
             name, b64, mimetype = attachment
@@ -83,6 +88,7 @@ class WhatsappMessage(models.Model):
             'attachment_id': att.id if att else False, 'res_model': res_model, 'res_id': res_id,
             'event_id': event.id if event else False, 'template_id': template.id if template else False,
             'priority': 9 if (event and (event.key or '').startswith('hold.')) else 5,
+            'from_seller': bool(account and account.user_id),
         })
         if send_now:
             msg._send()
@@ -96,8 +102,18 @@ class WhatsappMessage(models.Model):
             acc = msg.account_id
             if self.env.context.get('wa_account_id'):
                 acc = self.env['whatsapp.account'].browse(self.env.context['wa_account_id'])
+            body = msg.body or ''
             if not acc or acc.state != 'connected' or acc.paused:
-                acc = self.env['whatsapp.account'].get_default_account()  # failover a otra cuenta viva
+                acc = self.env['whatsapp.account'].get_default_account()  # failover al genérico
+                if acc and msg.from_seller and not acc.user_id and msg.res_model and msg.res_id and msg.res_model in self.env:
+                    # Iba a salir del teléfono del vendedor y cae al genérico: hay que
+                    # decirle al cliente con quién seguir.
+                    origin = self.env[msg.res_model].sudo().browse(msg.res_id).exists()
+                    if origin:
+                        block = self.env['whatsapp.event']._wa_base_ctx(origin).get('seller_block') or ''
+                        if block and block not in body:
+                            body = (body + '\n' + block).strip()
+                    msg.write({'from_seller': False, 'body': body})
             if not acc or acc.state != 'connected' or acc.paused:
                 msg.write({'state': 'failed', 'error': _('Sin cuenta WhatsApp conectada (o todas en pausa).'), 'retry_count': msg.retry_count + 1})
                 continue
@@ -106,9 +122,9 @@ class WhatsappMessage(models.Model):
                 res = None
                 if msg.attachment_id:
                     res = GW.send_media(acc.session_key, to, msg.attachment_id.datas.decode() if isinstance(msg.attachment_id.datas, bytes) else msg.attachment_id.datas,
-                                        msg.attachment_id.mimetype, msg.attachment_id.name, msg.body)
+                                        msg.attachment_id.mimetype, msg.attachment_id.name, body)
                 else:
-                    res = GW.send_text(acc.session_key, to, msg.body or '')
+                    res = GW.send_text(acc.session_key, to, body)
                 msg.write({
                     'state': 'sent', 'error': False, 'account_id': acc.id,
                     'wa_message_id': res.get('id'), 'jid': res.get('jid') or msg.jid,
@@ -196,11 +212,24 @@ class WhatsappMessage(models.Model):
         acc = self.env['whatsapp.account'].sudo().search([('session_key', '=', data.get('session'))], limit=1)
         phone = self.env['whatsapp.gateway'].normalize_phone(data.get('from') or '')
         partner = self.env['res.partner'].sudo().search([('phone', 'ilike', phone[-10:])], limit=1) if phone else self.env['res.partner']
+        origin = None
+        if acc.user_id:
+            # TELÉFONO DE VENDEDOR: solo se registra lo que viene de clientes
+            # conocidos (contacto en Odoo o con envío previo desde esta cuenta).
+            # Todo lo demás (chats personales) se descarta sin guardarse.
+            from datetime import timedelta
+            last = self.sudo().search([('direction', '=', 'out'), ('account_id', '=', acc.id), ('phone', '=', phone),
+                                       ('create_date', '>=', fields.Datetime.now() - timedelta(days=90))], order='id desc', limit=1)
+            if not partner and not last:
+                return None
+            if last and last.res_model and last.res_id and last.res_model in self.env and last.res_model != self._name:
+                origin = self.env[last.res_model].sudo().browse(last.res_id).exists() or None
         vals = {
             'direction': 'in', 'state': 'received', 'account_id': acc.id,
             'partner_id': partner.id, 'phone': phone, 'jid': data.get('jid'),
             'body': data.get('text') or '', 'wa_message_id': data.get('id'), 'pushname': data.get('pushname') or False,
-            'status_date': fields.Datetime.now(),
+            'status_date': fields.Datetime.now(), 'from_seller': bool(acc.user_id),
+            'res_model': origin._name if origin else False, 'res_id': origin.id if origin else False,
         }
         if data.get('base64'):
             att = self.env['ir.attachment'].sudo().create({
@@ -214,8 +243,19 @@ class WhatsappMessage(models.Model):
                 partner.message_post(body=_('WhatsApp recibido de %s: %s') % (phone, (msg.body or '')[:300]), message_type='notification')
             except Exception:  # noqa: BLE001
                 _logger.exception('[WHATSAPP] chatter del contacto no actualizado')
-        # Ruteo: reenvío al asesor + auto-respuesta. Un fallo aquí se registra
-        # pero NO tira el webhook (el mensaje ya quedó en la bitácora).
+        if acc.user_id:
+            # Teléfono de vendedor: es SU chat; sin auto-respuesta ni reenvío. Solo
+            # se deja el rastro (y el archivo) en la orden/reserva de origen.
+            if origin and hasattr(origin, 'message_post'):
+                try:
+                    att_copy = msg.attachment_id.copy({'res_model': origin._name, 'res_id': origin.id}) if msg.attachment_id else None
+                    origin.message_post(body='WhatsApp del cliente al teléfono de %s: %s' % (acc.user_id.name, (msg.body or '')[:500] or '(archivo adjunto)'),
+                                        attachment_ids=[att_copy.id] if att_copy else [])
+                except Exception:  # noqa: BLE001
+                    _logger.exception('[WHATSAPP] chatter de origen no actualizado')
+            return msg
+        # Ruteo (número genérico): reenvío al asesor + auto-respuesta. Un fallo
+        # aquí se registra pero NO tira el webhook (el mensaje ya quedó en bitácora).
         try:
             self.env['whatsapp.event'].sudo()._on_inbound(msg)
         except Exception as e:  # noqa: BLE001

@@ -1,0 +1,25 @@
+<odoo>
+    <record id="view_users_form_whatsapp" model="ir.ui.view">
+        <field name="name">res.users.form.whatsapp</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="WhatsApp" name="whatsapp" groups="som_whatsapp.group_whatsapp_user">
+                    <group>
+                        <field name="wa_connected"/>
+                        <field name="wa_account_id"/>
+                    </group>
+                    <button name="action_wa_my_account" type="object" string="Abrir / vincular su WhatsApp" class="btn-primary" icon="fa-whatsapp"/>
+                    <div class="text-muted mt8">Con el teléfono vinculado, todo lo de este vendedor sale desde su número; si no, del genérico de avisos.</div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+    <record id="action_whatsapp_my_account" model="ir.actions.server">
+        <field name="name">Mi WhatsApp</field>
+        <field name="model_id" ref="som_whatsapp.model_whatsapp_account"/>
+        <field name="state">code</field>
+        <field name="code">action = env['whatsapp.account'].action_my_account()</field>
+    </record>
+</odoo>

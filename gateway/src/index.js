@@ -143,7 +143,12 @@ function makeRetryCache() {
   return { get: (k) => m.get(k), set: (k, v) => m.set(k, v), del: (k) => m.delete(k), flushAll: () => m.clear() };
 }
 
-async function startSession(id) {
+function sessionOptionsFile(id) { return path.join(SESSIONS_DIR, id, "options.json"); }
+function loadSessionOptions(id) {
+  try { return JSON.parse(fs.readFileSync(sessionOptionsFile(id), "utf8")); } catch (e) { return {}; }
+}
+
+async function startSession(id, opts) {
   const existing = sessions.get(id);
   if (existing && (existing.status === "connected" || existing.starting)) return existing;
 
@@ -155,6 +160,12 @@ async function startSession(id) {
 
   const entry = existing || { status: "starting", phone: null, qr: null, qrAt: null };
   entry.sentStore = sentStore;
+  // Opciones por sesión (persisten para el arranque automático). mark_read
+  // solo en el número genérico: en el teléfono de un vendedor NO marcamos
+  // leídos sus chats.
+  const options = Object.assign({ mark_read: true }, loadSessionOptions(id), opts || {});
+  try { fs.mkdirSync(path.join(SESSIONS_DIR, id), { recursive: true }); fs.writeFileSync(sessionOptionsFile(id), JSON.stringify(options)); } catch (e) { /* opcional */ }
+  entry.options = options;
   entry.starting = true;
   entry.status = "starting";
   sessions.set(id, entry);
@@ -238,7 +249,7 @@ async function startSession(id) {
         } catch (e) { log.warn({ err: e.message }, "no se pudo descargar el medio"); }
       }
       webhook(payload);
-      try { await sock.readMessages([m.key]); } catch (e) { /* acuse de lectura: cosmético */ }
+      if (entry.options?.mark_read) { try { await sock.readMessages([m.key]); } catch (e) { /* cosmético */ } }
     }
   });
 
@@ -266,7 +277,7 @@ const wrap = (fn) => (req, res) => fn(req, res).catch((e) => { log.error(e); res
 
 app.get("/health", (req, res) => res.json({ ok: true, sessions: [...sessions.keys()], uptime: process.uptime() }));
 app.get("/sessions", (req, res) => res.json({ sessions: [...sessions.keys()].map(sessionState) }));
-app.post("/sessions/:id/start", wrap(async (req, res) => { await startSession(req.params.id); res.json(sessionState(req.params.id)); }));
+app.post("/sessions/:id/start", wrap(async (req, res) => { await startSession(req.params.id, req.body || {}); res.json(sessionState(req.params.id)); }));
 app.get("/sessions/:id/status", (req, res) => res.json(sessionState(req.params.id)));
 app.delete("/sessions/:id", wrap(async (req, res) => {
   const s = sessions.get(req.params.id);

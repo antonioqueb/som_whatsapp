@@ -38,6 +38,63 @@ class WhatsappAccount(models.Model):
     notes = fields.Text()
 
     _session_key_uniq = models.Constraint('unique(session_key)', 'Ya existe una cuenta con esa clave de sesión.')
+    _user_uniq = models.Constraint('unique(user_id)', 'Ese usuario ya tiene una cuenta de WhatsApp ligada.')
+
+    user_id = fields.Many2one('res.users', string='Vendedor (teléfono propio)', index=True, tracking=True,
+                              help='Vacío = número genérico de avisos. Con vendedor = su propio teléfono: todo lo suyo sale desde ahí, '
+                                   'sin aviso de "seguimiento con su asesor", y sus entrantes de clientes se registran en Odoo sin auto-respuesta.')
+    kind = fields.Selection([('generic', 'Genérico (avisos)'), ('seller', 'Teléfono de vendedor')], compute='_compute_kind', store=True)
+    is_live = fields.Boolean(compute='_compute_is_live', string='Operativa')
+    is_manager = fields.Boolean(compute='_compute_is_manager')
+
+    def _compute_is_manager(self):
+        ok = self.env.user.has_group('som_whatsapp.group_whatsapp_manager')
+        for rec in self:
+            rec.is_manager = ok
+
+    @api.depends('user_id')
+    def _compute_kind(self):
+        for rec in self:
+            rec.kind = 'seller' if rec.user_id else 'generic'
+
+    @api.depends('state', 'paused', 'active')
+    def _compute_is_live(self):
+        for rec in self:
+            rec.is_live = bool(rec.active and rec.state == 'connected' and not rec.paused)
+
+    @api.model
+    def seller_accounts_enabled(self):
+        return (self.env['ir.config_parameter'].sudo().get_param('som_whatsapp.seller_accounts', 'True') or 'True') not in ('False', '0', '')
+
+    @api.model
+    def for_user(self, user):
+        """Cuenta viva del vendedor, si la función está activa."""
+        if not user or not self.seller_accounts_enabled():
+            return self.browse()
+        return self.sudo().search([('user_id', '=', user.id), ('state', '=', 'connected'), ('paused', '=', False)], limit=1)
+
+    @api.model
+    def for_record(self, record):
+        """Ruteo: teléfono del vendedor responsable si está conectado; si no, el genérico."""
+        if record is not None and record:
+            user = getattr(record, 'user_id', False)
+            if user and user._name == 'res.users':
+                acc = self.for_user(user)
+                if acc:
+                    return acc
+        return self.get_default_account()
+
+    @api.model
+    def action_my_account(self):
+        """Menú 'Mi WhatsApp': abre (o crea) la cuenta del usuario actual."""
+        user = self.env.user
+        acc = self.sudo().search([('user_id', '=', user.id)], limit=1)
+        if not acc:
+            key = re.sub(r'[^a-z0-9-]+', '-', (user.login or 'u').split('@')[0].lower()).strip('-') or 'u'
+            key = 'v-%s-%d' % (key[:20], user.id)
+            acc = self.sudo().create({'name': 'WhatsApp de %s' % user.name, 'session_key': key, 'user_id': user.id, 'is_default': False})
+        return {'type': 'ir.actions.act_window', 'res_model': 'whatsapp.account', 'res_id': acc.id,
+                'view_mode': 'form', 'target': 'current', 'name': 'Mi WhatsApp'}
 
     @api.constrains('session_key')
     def _check_session_key(self):
@@ -54,10 +111,11 @@ class WhatsappAccount(models.Model):
     def get_default_account(self):
         """Failover: la predeterminada si está viva; si no, cualquier otra cuenta
         conectada y sin pausa; al final la predeterminada aunque esté caída."""
-        live = [('state', '=', 'connected'), ('paused', '=', False)]
+        # Solo cuentas GENÉRICAS: el teléfono de un vendedor jamás manda lo de otros.
+        live = [('user_id', '=', False), ('state', '=', 'connected'), ('paused', '=', False)]
         return (self.search([('is_default', '=', True)] + live, limit=1)
                 or self.search(live, order='sequence, id', limit=1)
-                or self.search([('is_default', '=', True)], limit=1))
+                or self.search([('is_default', '=', True), ('user_id', '=', False)], limit=1))
 
     paused = fields.Boolean(string='Envíos en pausa', tracking=True,
                             help='La cola no manda por esta cuenta. Lo activa el detector de bloqueos o un administrador.')
@@ -85,7 +143,7 @@ class WhatsappAccount(models.Model):
             rec.write({'paused': True, 'pause_reason': reason})
             rec.message_post(body='⛔ Envíos PAUSADOS automáticamente: %s. Revisa el teléfono (¿restricción de WhatsApp?) y pulsa Reanudar.' % reason)
             group = self.env.ref('som_whatsapp.group_whatsapp_manager', raise_if_not_found=False)
-            for user in (group.all_user_ids if group else self.env['res.users']):
+            for user in ((group.all_user_ids if group else self.env['res.users']) | rec.user_id):
                 try:
                     rec.activity_schedule('mail.mail_activity_data_todo', user_id=user.id,
                                           summary='WhatsApp %s en pausa' % rec.name, note=reason)
@@ -131,7 +189,7 @@ class WhatsappAccount(models.Model):
     def action_start(self):
         GW = self.env['whatsapp.gateway']
         for rec in self:
-            rec._apply_status(GW._request('POST', '/sessions/%s/start' % rec.session_key))
+            rec._apply_status(GW._request('POST', '/sessions/%s/start' % rec.session_key, {'mark_read': not rec.user_id}))
         return self._reload()
 
     def action_refresh(self):

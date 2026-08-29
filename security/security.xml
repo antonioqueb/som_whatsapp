@@ -20,6 +20,26 @@
         <field name="implied_ids" eval="[(4, ref('group_whatsapp_user'))]"/>
         <field name="comment">Configura gateway, cuentas (QR), plantillas y puntos de conexión.</field>
     </record>
+    <record id="whatsapp_account_rule_user_read" model="ir.rule">
+        <field name="name">WhatsApp: cuentas visibles para usuarios</field>
+        <field name="model_id" ref="model_whatsapp_account"/>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/><field name="perm_write" eval="False"/><field name="perm_create" eval="False"/><field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="whatsapp_account_rule_user_own" model="ir.rule">
+        <field name="name">WhatsApp: cada quien edita solo su cuenta</field>
+        <field name="model_id" ref="model_whatsapp_account"/>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="False"/><field name="perm_write" eval="True"/><field name="perm_create" eval="True"/><field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="whatsapp_account_rule_manager" model="ir.rule">
+        <field name="name">WhatsApp: administradores todo</field>
+        <field name="model_id" ref="model_whatsapp_account"/>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
     <record id="whatsapp_message_company_rule" model="ir.rule">
         <field name="name">WhatsApp: multi-compañía</field>
         <field name="model_id" ref="model_whatsapp_message"/>

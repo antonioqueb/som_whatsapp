@@ -45,6 +45,11 @@
                             </div>
                         </setting>
                     </block>
+                    <block title="Teléfonos de vendedores" name="whatsapp_sellers_block">
+                        <setting string="Cada vendedor desde su número" help="Con su teléfono vinculado (menú WhatsApp › Mi WhatsApp), sus avisos, documentos y reservas salen desde su número sin la nota de 'seguimiento con su asesor', y las respuestas de clientes se registran en la orden. Sin vincular: todo sale del número genérico. Chats personales del vendedor nunca se guardan.">
+                            <div class="row mt8"><field name="wa_seller_accounts"/></div>
+                        </setting>
+                    </block>
                     <block title="Anti-baneo" name="whatsapp_antiban_block">
                         <setting string="Ritmo humano" help="Goteo con pausas aleatorias y 'escribiendo…' antes de cada mensaje; tope diario con rampa para números nuevos.">
                             <div class="row mt8"><label for="wa_max_per_minute" class="col-lg-7 o_light_label"/><field name="wa_max_per_minute"/></div>

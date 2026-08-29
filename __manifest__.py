@@ -1,6 +1,6 @@
 {
     'name': 'SOM WhatsApp (Baileys)',
-    'version': '19.0.1.9.1',
+    'version': '19.0.1.10.0',
     'category': 'Tools',
     'summary': 'Notificaciones WhatsApp vía gateway Baileys con API HTTP estándar; puntos de conexión para enlazar procesos',
     'description': """
@@ -34,6 +34,7 @@ WhatsApp para Odoo (SOM)
         'data/whatsapp_sale_data.xml',
         'data/whatsapp_inbound_data.xml',
         'views/sale_order_views.xml',
+        'views/res_users_views.xml',
         'views/stock_lot_hold_order_views.xml',
         'views/menus.xml',
     ],
