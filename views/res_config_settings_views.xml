@@ -39,7 +39,7 @@
         <field name="name">Ajustes WhatsApp</field>
         <field name="res_model">res.config.settings</field>
         <field name="view_mode">form</field>
-        <field name="target">inline</field>
+        <field name="target">current</field>
         <field name="context">{'module': 'som_whatsapp'}</field>
     </record>
 </odoo>
