@@ -143,10 +143,10 @@ class StockLotHoldOrder(models.Model):
 
     @api.model
     def _cron_wa_hold_notices(self):
-        """Cada hora. UN solo aviso automático por reserva, el DÍA del vencimiento:
-        al vendedor (interno) y al cliente (con el contacto directo de su asesor).
-        Sale a partir de la hora matutina configurada, o antes si el vencimiento
-        está a menos de 3 h. Los envíos se escalonan (anti-ráfaga)."""
+        """Cada hora. VENDEDOR: aviso interno 2 días antes (T-2) y el día del
+        vencimiento (T-0). CLIENTE: un solo aviso, el día del vencimiento, con el
+        contacto directo de su asesor. Desde la hora matutina configurada (o antes
+        si vence en menos de 3 h). Los envíos se escalonan (anti-ráfaga)."""
         from datetime import timedelta
         P = self.env['ir.config_parameter'].sudo()
         try:
@@ -159,18 +159,25 @@ class StockLotHoldOrder(models.Model):
         orders = self.sudo().search([
             ('state', '=', 'confirmed'),
             ('fecha_expiracion', '>', now_utc),
-            ('fecha_expiracion', '<', now_utc + timedelta(hours=30)),
+            ('fecha_expiracion', '<', now_utc + timedelta(days=3)),
         ])
         for order in orders:
             try:
                 exp = order._wa_local_expiry()
-                if exp.date() != today:
-                    continue
+                days = (exp.date() - today).days
                 if now_local.hour < morning and (exp - now_local) > timedelta(hours=3):
                     continue
+                seller_phone = order.user_id.partner_id.phone or ''
+                seller_who = 'el vendedor %s' % (order.user_id.name or '')
+                # Vendedor T-2 (si el cron no corrió ese día, alcanza en T-1 como "mañana")
+                if not order.x_wa_seller_t2_sent and days in (1, 2):
+                    order._wa_fire_stage(KEY_SELLER_T2, 'x_wa_seller_t2_sent', seller_phone, seller_who,
+                                         'en 2 días' if days == 2 else 'mañana')
+                if days != 0:
+                    self.env.cr.commit()
+                    continue
                 if not order.x_wa_seller_t0_sent:
-                    order._wa_fire_stage(KEY_SELLER_T0, 'x_wa_seller_t0_sent', order.user_id.partner_id.phone or '',
-                                         'el vendedor %s' % (order.user_id.name or ''), 'HOY')
+                    order._wa_fire_stage(KEY_SELLER_T0, 'x_wa_seller_t0_sent', seller_phone, seller_who, 'HOY')
                 if not order.x_wa_client_sent:
                     order._wa_fire_stage(KEY_CLIENT, 'x_wa_client_sent', order.partner_id.phone or '',
                                          'el cliente %s' % (order.partner_id.display_name or ''), 'hoy')

@@ -78,7 +78,7 @@
                         </setting>
                     </block>
                     <block title="Reservas (holds)" name="whatsapp_holds_block">
-                        <setting string="Avisos de vencimiento" help="Un solo aviso el día del vencimiento: al vendedor (interno) y al cliente con el contacto de su asesor (solo si tiene teléfono).">
+                        <setting string="Avisos de vencimiento" help="Vendedor: aviso interno 2 días antes y el día del vencimiento. Cliente: solo el día del vencimiento, con el contacto de su asesor (si tiene teléfono).">
                             <div class="row mt8">
                                 <label for="wa_hold_morning_hour" class="col-lg-6 o_light_label"/><field name="wa_hold_morning_hour"/>
                             </div>

@@ -13,7 +13,8 @@
                 <page string="WhatsApp" groups="som_whatsapp.group_whatsapp_user">
                     <group>
                         <group string="Avisos automáticos enviados">
-                                                        <field name="x_wa_seller_t0_sent" readonly="1"/>
+                                                        <field name="x_wa_seller_t2_sent" readonly="1"/>
+                            <field name="x_wa_seller_t0_sent" readonly="1"/>
                             <field name="x_wa_client_sent" readonly="1"/>
                         </group>
                         <group string="Teléfonos">
@@ -21,7 +22,7 @@
                         </group>
                     </group>
                     <div class="text-muted">
-                        El día del vencimiento: aviso interno al vendedor y aviso al cliente con el contacto de su asesor (solo si tiene teléfono).
+                        Vendedor: aviso interno 2 días antes y el día del vencimiento. Cliente: solo el día del vencimiento, con el contacto de su asesor (si tiene teléfono).
                         Renovar la reserva re-arma los avisos.
                     </div>
                 </page>

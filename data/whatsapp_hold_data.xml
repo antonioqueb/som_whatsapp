@@ -52,7 +52,6 @@ Para confirmar, {{ ctx.get('followup_contact') }}</field>
     <record id="wa_event_hold_seller_t2" model="whatsapp.event">
         <field name="name">Reserva vence en 2 días → vendedor</field>
         <field name="key">hold.seller_t2</field>
-        <field name="active" eval="False"/>
         <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
         <field name="template_id" ref="wa_template_hold_seller_t2"/>
         <field name="recipient_mode">partner_field</field>
