@@ -152,6 +152,13 @@ class WhatsappMessage(models.Model):
         self._send()
 
     @api.model
+    def _is_internal_recipient(self):
+        self.ensure_one()
+        if self.partner_id and self.partner_id.user_ids.filtered(lambda u: not u.share):
+            return True
+        return bool(self.phone) and bool(self.env['res.users'].sudo().search_count(
+            [('share', '=', False), ('active', '=', True), ('partner_id.phone', 'ilike', self.phone[-10:])]))
+
     def _cron_send_queue(self, limit=50):
         """Goteo anti-ráfaga: máximo N por minuto con pausas aleatorias, dentro de
         la ventana horaria, respetando el tope diario (con rampa) por cuenta,
@@ -177,16 +184,14 @@ class WhatsappMessage(models.Model):
         if state == 'sunday':
             dom.append(('priority', '>=', 9))
         budget = {acc.id: max(0, Policy.daily_cap_for(acc) - Policy.sent_today(acc)) for acc in accounts}
-        if not any(budget.values()):
-            _logger.info('[WHATSAPP] tope diario alcanzado en todas las cuentas; cola diferida')
-            return True
         msgs = self.search(dom, order='priority desc, id asc', limit=limit)
         sent = 0
         for msg in msgs:
             if sent >= p['max_per_minute']:
                 break
             acc = msg.account_id if (msg.account_id in accounts) else accounts[0]
-            if budget.get(acc.id, 0) <= 0:
+            internal = msg._is_internal_recipient()  # avisos a vendedores: no gastan el tope diario
+            if budget.get(acc.id, 0) <= 0 and not internal:
                 continue
             if msg.error and 'no tiene WhatsApp' in (msg.error or ''):
                 msg.write({'retry_count': 3})  # permanente: no reintentar
@@ -194,7 +199,7 @@ class WhatsappMessage(models.Model):
             if sent:
                 time.sleep(Policy.jitter_seconds())
             msg.with_context(wa_account_id=acc.id)._send()
-            if msg.state == 'sent':
+            if msg.state == 'sent' and not internal:
                 budget[acc.id] -= 1
             sent += 1
             self.env.cr.commit()

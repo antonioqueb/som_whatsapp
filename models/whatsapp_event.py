@@ -302,6 +302,7 @@ class WhatsappEvent(models.Model):
             notified_as_client = Msg.search_count([
                 ('direction', '=', 'out'), ('phone', '=', message.phone),
                 ('res_model', 'not in', (False, 'whatsapp.message')),
+                ('partner_id', '!=', internal.partner_id.id),  # los avisos internos (T-2/T-0) no cuentan
                 ('create_date', '>=', fields.Datetime.now() - timedelta(days=30))])
             if not notified_as_client:
                 return False

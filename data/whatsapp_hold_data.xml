@@ -2,19 +2,18 @@
     <record id="wa_template_hold_seller_t2" model="whatsapp.template">
         <field name="name">Reserva · vendedor · vence en 2 días</field>
         <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
-        <field name="body">⏳ *Reserva {{ object.name }} vence {{ ctx.get('when') }}* · {{ ctx.get('expiry') }}
-Cliente: {{ ctx.get('client') }} · Job: {{ ctx.get('job') }}
+        <field name="body">🔒 Aviso interno · *Reserva {{ object.name }} vence {{ ctx.get('when') }}* ({{ ctx.get('expiry') }})
+Cliente: *{{ ctx.get('client') }}*{{ ctx.get('client_phone_pretty') and (' · ' + ctx.get('client_phone_pretty')) or '' }} · Job: {{ ctx.get('job') }}
 {{ ctx.get('lines') }}
-Al vencer, otro vendedor puede tomarlas. 🔗 {{ ctx.get('link') }}</field>
+Al vencer, otro vendedor puede tomarlas. Contacta al cliente para renovar o convertir en venta.</field>
     </record>
     <record id="wa_template_hold_seller_t0" model="whatsapp.template">
         <field name="name">Reserva · vendedor · vence hoy</field>
         <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
-        <field name="body">⚠️ *Reserva {{ object.name }} vence HOY a las {{ ctx.get('expiry_time') }}*
-Cliente: {{ ctx.get('client') }} · Job: {{ ctx.get('job') }}
+        <field name="body">🔒 Aviso interno · *Reserva {{ object.name }} vence HOY a las {{ ctx.get('expiry_time') }}*
+Cliente: *{{ ctx.get('client') }}*{{ ctx.get('client_phone_pretty') and (' · ' + ctx.get('client_phone_pretty')) or '' }} · Job: {{ ctx.get('job') }}
 {{ ctx.get('lines') }}
-Renuévala o conviértela en venta; al vencer, el material se libera.
-🔗 {{ ctx.get('link') }}</field>
+Al vencer, el material se libera. Contacta al cliente hoy para renovar o convertir en venta.</field>
     </record>
     <record id="wa_template_hold_client" model="whatsapp.template">
         <field name="name">Reserva · cliente · vence hoy/mañana</field>

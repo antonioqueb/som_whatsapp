@@ -82,9 +82,10 @@ class WhatsappPolicy(models.AbstractModel):
     def sent_today(self, account):
         start_local = self.now_local().replace(hour=0, minute=0, second=0, microsecond=0)
         start_utc = start_local.astimezone(pytz.utc).replace(tzinfo=None)
-        return self.env['whatsapp.message'].sudo().search_count([
+        msgs = self.env['whatsapp.message'].sudo().search([
             ('direction', '=', 'out'), ('account_id', '=', account.id),
             ('state', 'in', ('sent', 'delivered', 'read')), ('sent_date', '>=', start_utc)])
+        return len(msgs.filtered(lambda m: not m._is_internal_recipient()))
 
     @api.model
     def is_optout_text(self, text):

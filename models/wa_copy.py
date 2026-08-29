@@ -14,16 +14,15 @@ HOLD_DOCUMENT = """{Hola|Buen día|Qué tal} {{ object.partner_id.name }}, le sa
 {Le compartimos|Le enviamos|Adjuntamos} el documento de su reserva *{{ object.name }}* ({{ ctx.get('lines_short') }}), apartada solo hasta el {{ ctx.get('expiry') }} hora de Monterrey. Son piezas únicas: después de esa fecha quedan libres para otro cliente.
 Para confirmar o extender, su asesor {{ ctx.get('seller_contact') }}."""
 
-HOLD_SELLER_T2 = """⏳ *Reserva {{ object.name }} vence {{ ctx.get('when') }}* · {{ ctx.get('expiry') }}
-Cliente: {{ ctx.get('client') }} · Job: {{ ctx.get('job') }}
+HOLD_SELLER_T2 = """🔒 Aviso interno · *Reserva {{ object.name }} vence {{ ctx.get('when') }}* ({{ ctx.get('expiry') }})
+Cliente: *{{ ctx.get('client') }}*{{ ctx.get('client_phone_pretty') and (' · ' + ctx.get('client_phone_pretty')) or '' }} · Job: {{ ctx.get('job') }}
 {{ ctx.get('lines') }}
-Al vencer, otro vendedor puede tomarlas. 🔗 {{ ctx.get('link') }}"""
+Al vencer, otro vendedor puede tomarlas. Contacta al cliente para renovar o convertir en venta."""
 
-HOLD_SELLER_T0 = """⚠️ *Reserva {{ object.name }} vence HOY a las {{ ctx.get('expiry_time') }}*
-Cliente: {{ ctx.get('client') }} · Job: {{ ctx.get('job') }}
+HOLD_SELLER_T0 = """🔒 Aviso interno · *Reserva {{ object.name }} vence HOY a las {{ ctx.get('expiry_time') }}*
+Cliente: *{{ ctx.get('client') }}*{{ ctx.get('client_phone_pretty') and (' · ' + ctx.get('client_phone_pretty')) or '' }} · Job: {{ ctx.get('job') }}
 {{ ctx.get('lines') }}
-Renuévala o conviértela en venta; al vencer, el material se libera.
-🔗 {{ ctx.get('link') }}"""
+Al vencer, el material se libera. Contacta al cliente hoy para renovar o convertir en venta."""
 
 INBOUND_AUTOREPLY = """{{ ctx.get('notice') }}
 {{ ctx.get('seller_followup') }}"""
