@@ -3,8 +3,8 @@
         <field name="name">Venta confirmada · cliente (PDF)</field>
         <field name="model_id" ref="sale.model_sale_order"/>
         <field name="attach_report_id" ref="sale.action_report_saleorder"/>
-        <field name="body">Hola {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
-Su pedido *{{ object.name }}*{{ ctx.get('job_suffix') }} quedó confirmado; adjuntamos el documento.
+        <field name="body">{Hola|Buen día|Qué tal} {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
+Su pedido *{{ object.name }}*{{ ctx.get('job_suffix') }} quedó confirmado; {adjuntamos el documento|le compartimos el documento|aquí tiene el documento}.
 {{ ctx.get('seller_block') }}</field>
     </record>
     <record id="wa_event_sale_confirmed" model="whatsapp.event">

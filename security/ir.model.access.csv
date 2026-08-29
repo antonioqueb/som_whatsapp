@@ -8,3 +8,5 @@ access_whatsapp_template_manager,whatsapp.template manager,model_whatsapp_templa
 access_whatsapp_event_user,whatsapp.event user,model_whatsapp_event,group_whatsapp_user,1,0,0,0
 access_whatsapp_event_manager,whatsapp.event manager,model_whatsapp_event,group_whatsapp_manager,1,1,1,1
 access_whatsapp_compose_user,whatsapp.compose user,model_whatsapp_compose,group_whatsapp_user,1,1,1,1
+access_whatsapp_blocklist_user,whatsapp.blocklist user,model_whatsapp_blocklist,group_whatsapp_user,1,0,0,0
+access_whatsapp_blocklist_manager,whatsapp.blocklist manager,model_whatsapp_blocklist,group_whatsapp_manager,1,1,1,1

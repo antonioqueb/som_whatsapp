@@ -43,6 +43,8 @@ class WhatsappMessage(models.Model):
     user_id = fields.Many2one('res.users', string='Enviado por', default=lambda self: self.env.user)
     company_id = fields.Many2one('res.company', default=lambda self: self.env.company)
     pushname = fields.Char(string='Nombre en WhatsApp', help='Nombre que el remitente muestra en WhatsApp (entrantes).')
+    priority = fields.Integer(default=5, help='9 = urgente (vencimientos del día); se envía primero y también en domingo.')
+    scheduled_at = fields.Datetime(string='No antes de', help='Escalonado anti-ráfaga: la cola no lo manda antes de esta hora.')
     seller_partner_id = fields.Many2one('res.partner', string='Vendedor (seguimiento)', index=True,
                                         help='Entrantes: asesor al que se reenvió el mensaje del cliente.')
     retry_count = fields.Integer(default=0)
@@ -66,6 +68,8 @@ class WhatsappMessage(models.Model):
             raise UserError(_('El contacto no tiene teléfono para WhatsApp.'))
         if partner and getattr(partner, 'whatsapp_opt_out', False):
             raise UserError(_('%s pidió no recibir WhatsApp.') % partner.display_name)
+        if not self.env.context.get('wa_skip_blocklist') and self.env['whatsapp.blocklist'].is_blocked(phone):
+            raise UserError(_('El número %s pidió no recibir WhatsApp de esta cuenta.') % phone)
         account = account or self.env['whatsapp.account'].get_default_account()
         att = attachment
         if isinstance(attachment, tuple):
@@ -78,6 +82,7 @@ class WhatsappMessage(models.Model):
             'partner_id': partner.id if partner else False, 'phone': phone, 'body': body or '',
             'attachment_id': att.id if att else False, 'res_model': res_model, 'res_id': res_id,
             'event_id': event.id if event else False, 'template_id': template.id if template else False,
+            'priority': 9 if (event and (event.key or '').startswith('hold.')) else 5,
         })
         if send_now:
             msg._send()
@@ -88,9 +93,13 @@ class WhatsappMessage(models.Model):
         for msg in self:
             if msg.direction != 'out' or msg.state not in ('queued', 'failed'):
                 continue
-            acc = msg.account_id or self.env['whatsapp.account'].get_default_account()
-            if not acc or acc.state != 'connected':
-                msg.write({'state': 'failed', 'error': _('Sin cuenta WhatsApp conectada.'), 'retry_count': msg.retry_count + 1})
+            acc = msg.account_id
+            if self.env.context.get('wa_account_id'):
+                acc = self.env['whatsapp.account'].browse(self.env.context['wa_account_id'])
+            if not acc or acc.state != 'connected' or acc.paused:
+                acc = self.env['whatsapp.account'].get_default_account()  # failover a otra cuenta viva
+            if not acc or acc.state != 'connected' or acc.paused:
+                msg.write({'state': 'failed', 'error': _('Sin cuenta WhatsApp conectada (o todas en pausa).'), 'retry_count': msg.retry_count + 1})
                 continue
             try:
                 to = msg.jid or msg.phone
@@ -128,11 +137,51 @@ class WhatsappMessage(models.Model):
 
     @api.model
     def _cron_send_queue(self, limit=50):
-        msgs = self.search([('direction', '=', 'out'), ('state', '=', 'queued')], limit=limit, order='id asc')
-        msgs._send()
-        # Reintento automático de fallidos recientes (máx. 3 intentos)
-        retry = self.search([('direction', '=', 'out'), ('state', '=', 'failed'), ('retry_count', '<', 3)], limit=limit)
-        retry._send()
+        """Goteo anti-ráfaga: máximo N por minuto con pausas aleatorias, dentro de
+        la ventana horaria, respetando el tope diario (con rampa) por cuenta,
+        prioridades y programación; el detector de bloqueos pausa la cuenta."""
+        import time
+        Policy = self.env['whatsapp.policy']
+        Account = self.env['whatsapp.account'].sudo()
+        p = Policy.params()
+        state, why = Policy.window_state()
+        accounts = Account.search([('state', '=', 'connected'), ('paused', '=', False)])
+        if p['health_guard']:
+            for acc in accounts:
+                acc._check_health()
+            accounts = accounts.filtered(lambda a: not a.paused)
+        if not accounts:
+            return True
+        now = fields.Datetime.now()
+        dom = [('direction', '=', 'out'), '|', ('state', '=', 'queued'),
+               '&', ('state', '=', 'failed'), ('retry_count', '<', 3),
+               '|', ('scheduled_at', '=', False), ('scheduled_at', '<=', now)]
+        if state == 'closed':
+            return True
+        if state == 'sunday':
+            dom.append(('priority', '>=', 9))
+        budget = {acc.id: max(0, Policy.daily_cap_for(acc) - Policy.sent_today(acc)) for acc in accounts}
+        if not any(budget.values()):
+            _logger.info('[WHATSAPP] tope diario alcanzado en todas las cuentas; cola diferida')
+            return True
+        msgs = self.search(dom, order='priority desc, id asc', limit=limit)
+        sent = 0
+        for msg in msgs:
+            if sent >= p['max_per_minute']:
+                break
+            acc = msg.account_id if (msg.account_id in accounts) else accounts[0]
+            if budget.get(acc.id, 0) <= 0:
+                continue
+            if msg.error and 'no tiene WhatsApp' in (msg.error or ''):
+                msg.write({'retry_count': 3})  # permanente: no reintentar
+                continue
+            if sent:
+                time.sleep(Policy.jitter_seconds())
+            msg.with_context(wa_account_id=acc.id)._send()
+            if msg.state == 'sent':
+                budget[acc.id] -= 1
+            sent += 1
+            self.env.cr.commit()
         return True
 
     # ── entrada por webhook ──

@@ -52,8 +52,63 @@ class WhatsappAccount(models.Model):
 
     @api.model
     def get_default_account(self):
-        acc = self.search([('is_default', '=', True), ('state', '=', 'connected')], limit=1)
-        return acc or self.search([('state', '=', 'connected')], limit=1) or self.search([('is_default', '=', True)], limit=1)
+        """Failover: la predeterminada si está viva; si no, cualquier otra cuenta
+        conectada y sin pausa; al final la predeterminada aunque esté caída."""
+        live = [('state', '=', 'connected'), ('paused', '=', False)]
+        return (self.search([('is_default', '=', True)] + live, limit=1)
+                or self.search(live, order='sequence, id', limit=1)
+                or self.search([('is_default', '=', True)], limit=1))
+
+    paused = fields.Boolean(string='Envíos en pausa', tracking=True,
+                            help='La cola no manda por esta cuenta. Lo activa el detector de bloqueos o un administrador.')
+    pause_reason = fields.Char(string='Motivo de la pausa')
+    first_connected = fields.Date(string='Primera conexión', help='Arranca la rampa de calentamiento (20/50/100 por día en las primeras semanas).')
+    sent_today = fields.Integer(compute='_compute_quota', string='Enviados hoy')
+    daily_cap_effective = fields.Integer(compute='_compute_quota', string='Tope de hoy')
+
+    def _compute_quota(self):
+        Policy = self.env['whatsapp.policy']
+        for rec in self:
+            rec.sent_today = Policy.sent_today(rec) if rec.id else 0
+            rec.daily_cap_effective = Policy.daily_cap_for(rec)
+
+    def action_resume(self):
+        self.write({'paused': False, 'pause_reason': False})
+        for rec in self:
+            rec.message_post(body='Envíos reanudados por %s.' % self.env.user.name)
+        return self._reload()
+
+    def _pause(self, reason):
+        for rec in self:
+            if rec.paused:
+                continue
+            rec.write({'paused': True, 'pause_reason': reason})
+            rec.message_post(body='⛔ Envíos PAUSADOS automáticamente: %s. Revisa el teléfono (¿restricción de WhatsApp?) y pulsa Reanudar.' % reason)
+            group = self.env.ref('som_whatsapp.group_whatsapp_manager', raise_if_not_found=False)
+            for user in (group.all_user_ids if group else self.env['res.users']):
+                try:
+                    rec.activity_schedule('mail.mail_activity_data_todo', user_id=user.id,
+                                          summary='WhatsApp %s en pausa' % rec.name, note=reason)
+                except Exception:  # noqa: BLE001
+                    pass
+
+    def _check_health(self):
+        """Detector de bloqueos: fallos consecutivos o mensajes que nunca se entregan."""
+        from datetime import timedelta
+        Msg = self.env['whatsapp.message'].sudo()
+        for rec in self:
+            last = Msg.search([('direction', '=', 'out'), ('account_id', '=', rec.id),
+                               ('state', 'in', ('sent', 'delivered', 'read', 'failed'))], order='id desc', limit=10)
+            if len(last) < 6:
+                continue
+            recent6 = last[:6]
+            if sum(1 for m in recent6 if m.state == 'failed') >= 5:
+                rec._pause('5 de los últimos 6 envíos fallaron')
+                continue
+            older = [m for m in last[:8] if m.sent_date and m.sent_date < fields.Datetime.now() - timedelta(minutes=30)]
+            if len(older) >= 6 and all(m.state == 'sent' for m in older):
+                rec._pause('%d mensajes enviados hace más de 30 min sin llegar a entregados' % len(older))
+
 
     # ── ciclo de vida de la sesión ──
     def _apply_status(self, data):
@@ -69,6 +124,8 @@ class WhatsappAccount(models.Model):
                 vals['qr_at'] = fields.Datetime.now()
             elif data.get('status') == 'connected':
                 vals['qr_image'] = False
+                if not rec.first_connected:
+                    vals['first_connected'] = fields.Date.context_today(rec)
             rec.write(vals)
 
     def action_start(self):

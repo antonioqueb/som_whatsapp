@@ -2,16 +2,16 @@
 con quién se da seguimiento. El aviso "número no atendido" (ctx.notice) va
 SOLO en la auto-respuesta cuando el cliente escribe."""
 
-SALE_CONFIRMED = """Hola {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
-Su pedido *{{ object.name }}*{{ ctx.get('job_suffix') }} quedó confirmado; adjuntamos el documento.
+SALE_CONFIRMED = """{Hola|Buen día|Qué tal} {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
+Su pedido *{{ object.name }}*{{ ctx.get('job_suffix') }} quedó confirmado; {adjuntamos el documento|le compartimos el documento|aquí tiene el documento}.
 {{ ctx.get('seller_block') }}"""
 
-HOLD_CLIENT = """Hola {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
-Su reserva *{{ object.name }}* ({{ ctx.get('lines_short') }}) vence {{ ctx.get('when') }} a las {{ ctx.get('expiry_time') }}. Son piezas únicas: al vencer quedan libres para otro cliente y no podemos reponerlas.
+HOLD_CLIENT = """{Hola|Buen día|Qué tal} {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
+Su reserva *{{ object.name }}* ({{ ctx.get('lines_short') }}) vence {{ ctx.get('when') }} a las {{ ctx.get('expiry_time') }}. {Son piezas únicas|Se trata de piezas únicas|Cada placa es única}: al vencer {quedan libres para otro cliente|se liberan para cualquier otro cliente} y no podemos reponerlas.
 Para extenderla o confirmar su pedido, su asesor {{ ctx.get('seller_contact') }}."""
 
-HOLD_DOCUMENT = """Hola {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
-Le compartimos el documento de su reserva *{{ object.name }}* ({{ ctx.get('lines_short') }}), apartada solo hasta el {{ ctx.get('expiry') }} hora de Monterrey. Son piezas únicas: después de esa fecha quedan libres para otro cliente.
+HOLD_DOCUMENT = """{Hola|Buen día|Qué tal} {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
+{Le compartimos|Le enviamos|Adjuntamos} el documento de su reserva *{{ object.name }}* ({{ ctx.get('lines_short') }}), apartada solo hasta el {{ ctx.get('expiry') }} hora de Monterrey. Son piezas únicas: después de esa fecha quedan libres para otro cliente.
 Para confirmar o extender, su asesor {{ ctx.get('seller_contact') }}."""
 
 HOLD_SELLER_T2 = """⏳ *Reserva {{ object.name }} vence {{ ctx.get('when') }}* · {{ ctx.get('expiry') }}

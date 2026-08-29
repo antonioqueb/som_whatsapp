@@ -37,3 +37,6 @@ Endpoints: `GET /health`, `POST /sessions/:id/start`, `GET /sessions/:id/status`
 - Toda plantilla dispone de `ctx.seller_block`, `ctx.notice`, `ctx.seller_link`, `ctx.client_link`, `ctx.ref`, `ctx.job_suffix`.
 - Entrantes (`whatsapp.event._on_inbound`): el mensaje del cliente se reenvía al asesor desde el mismo número (`inbound.forward_seller`, adjuntos incluidos) y al cliente se le responde una vez por ventana (`inbound.client_autoreply`) reiterando que el seguimiento es con su asesor. Usuarios internos no reciben auto-respuesta. Sin asesor → número de respaldo (Ajustes).
 - Legado eliminado: wizard `som.whatsapp.send` (hoja nativa de compartir) de inventory_shopping_cart.
+
+## Anti-baneo (Ajustes › WhatsApp › Anti-baneo)
+Goteo con jitter y "escribiendo…", tope diario con rampa de calentamiento por cuenta, ventana horaria (domingo solo urgentes), avisos de reservas escalonados, variantes de texto `{a|b}`, baja inmediata (BAJA/STOP → lista de baja), detector de bloqueos (pausa la cuenta y avisa), failover automático a otra cuenta conectada.

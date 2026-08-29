@@ -115,6 +115,12 @@ class StockLotHoldOrder(models.Model):
             return self.env['whatsapp.message']
         msgs = self.env['whatsapp.event'].sudo().fire(key, self, extra_ctx=self._wa_ctx(when_text))
         self.write({flag: True})
+        # Escalonado anti-ráfaga: cada aviso sale en un minuto distinto de la
+        # mañana (nunca después de 1 h antes del vencimiento).
+        Policy = self.env['whatsapp.policy']
+        spread = Policy.params()['hold_spread_minutes']
+        for m in msgs:
+            m.write({'scheduled_at': Policy.spread_datetime(spread, not_after=self.fecha_expiracion)})
         if msgs:
             self.message_post(body='WhatsApp enviado a %s (%s%s).' % (
                 who, key, (' · vence %s' % when_text) if when_text else ''))

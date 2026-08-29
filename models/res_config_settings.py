@@ -21,6 +21,18 @@ class ResConfigSettings(models.TransientModel):
     wa_fallback_forward_phone = fields.Char(
         string='Número de respaldo (sin asesor)', config_parameter='som_whatsapp.fallback_forward_phone',
         help='Si un cliente escribe y no se identifica asesor, el mensaje se reenvía aquí (p. ej. gerencia de ventas).')
+    wa_max_per_minute = fields.Integer(string='Máximo por minuto', config_parameter='som_whatsapp.max_per_minute', default=5)
+    wa_jitter_min = fields.Integer(string='Pausa mínima entre mensajes (s)', config_parameter='som_whatsapp.jitter_min', default=6)
+    wa_jitter_max = fields.Integer(string='Pausa máxima entre mensajes (s)', config_parameter='som_whatsapp.jitter_max', default=14)
+    wa_daily_cap = fields.Integer(string='Tope diario por cuenta', config_parameter='som_whatsapp.daily_cap', default=200)
+    wa_warmup = fields.Boolean(string='Rampa de calentamiento (20 / 50 / 100 por día las primeras semanas)', config_parameter='som_whatsapp.warmup', default=True)
+    wa_window_start = fields.Integer(string='Ventana de envío: desde (h)', config_parameter='som_whatsapp.window_start', default=9)
+    wa_window_end = fields.Integer(string='Ventana de envío: hasta (h)', config_parameter='som_whatsapp.window_end', default=20)
+    wa_sunday_urgent_only = fields.Boolean(string='Domingo: solo avisos urgentes', config_parameter='som_whatsapp.sunday_urgent_only', default=True)
+    wa_hold_spread_minutes = fields.Integer(string='Escalonar avisos de reservas (min)', config_parameter='som_whatsapp.hold_spread_minutes', default=150)
+    wa_optout_keywords = fields.Char(string='Palabras de baja', config_parameter='som_whatsapp.optout_keywords',
+                                     help='Separadas por coma. Quien las escriba deja de recibir mensajes al instante.')
+    wa_health_guard = fields.Boolean(string='Detector de bloqueos (pausa la cuenta sola)', config_parameter='som_whatsapp.health_guard', default=True)
     wa_hold_morning_hour = fields.Integer(
         string='Hora de envío (reservas)', config_parameter='som_whatsapp_holds.morning_hour', default=9,
         help='Hora local (Monterrey) a partir de la cual el cron manda los avisos de reservas. '

@@ -13,6 +13,8 @@
                 <field name="attachment_id" optional="show"/>
                 <field name="res_ref" optional="show"/>
                 <field name="seller_partner_id" optional="show"/>
+                <field name="priority" optional="hide"/>
+                <field name="scheduled_at" optional="hide"/>
                 <field name="event_id" optional="hide"/>
                 <field name="state" widget="badge" decoration-success="state in ('delivered', 'read')" decoration-info="state == 'sent'" decoration-warning="state == 'queued'" decoration-danger="state == 'failed'"/>
             </list>
@@ -77,5 +79,18 @@
         <field name="name">Mensajes WhatsApp</field>
         <field name="res_model">whatsapp.message</field>
         <field name="view_mode">list,form</field>
+    </record>
+    <record id="view_whatsapp_blocklist_list" model="ir.ui.view">
+        <field name="name">whatsapp.blocklist.list</field>
+        <field name="model">whatsapp.blocklist</field>
+        <field name="arch" type="xml">
+            <list editable="bottom"><field name="create_date" string="Fecha"/><field name="phone"/><field name="partner_id"/><field name="reason"/><field name="source_text"/></list>
+        </field>
+    </record>
+    <record id="action_whatsapp_blocklist" model="ir.actions.act_window">
+        <field name="name">Lista de baja</field>
+        <field name="res_model">whatsapp.blocklist</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Nadie ha pedido baja</p><p>Quien escriba BAJA/STOP al número de avisos aparece aquí y no vuelve a recibir mensajes.</p></field>
     </record>
 </odoo>

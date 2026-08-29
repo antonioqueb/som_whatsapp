@@ -80,6 +80,18 @@ function normalizePhone(raw) {
   return d;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Ritmo humano: "escribiendo…" proporcional al largo del texto antes de enviar.
+async function humanTyping(sock, jid, text) {
+  try {
+    await sock.presenceSubscribe(jid);
+    await sock.sendPresenceUpdate("composing", jid);
+    const ms = Math.min(1000 + (text || "").length * 35, 6000) + Math.floor(Math.random() * 1500);
+    await sleep(ms);
+    await sock.sendPresenceUpdate("paused", jid);
+  } catch (e) { /* la presencia es cosmética: nunca bloquea el envío */ }
+}
+
 async function resolveJid(sock, to) {
   if (String(to).includes("@")) return String(to);
   const phone = normalizePhone(to);
@@ -179,6 +191,7 @@ async function startSession(id) {
         } catch (e) { log.warn({ err: e.message }, "no se pudo descargar el medio"); }
       }
       webhook(payload);
+      try { await sock.readMessages([m.key]); } catch (e) { /* acuse de lectura: cosmético */ }
     }
   });
 
@@ -235,6 +248,7 @@ app.post("/sessions/:id/send", wrap(async (req, res) => {
   const { to, text } = req.body || {};
   if (!text) throw new Error("text requerido");
   const jid = await resolveJid(sock, to);
+  if (req.body.typing !== false) await humanTyping(sock, jid, String(text));
   const sent = await sock.sendMessage(jid, { text: String(text) });
   res.json({ id: sent?.key?.id, jid });
 }));
@@ -244,6 +258,7 @@ app.post("/sessions/:id/send-media", wrap(async (req, res) => {
   const { to, caption, mimetype, filename, base64 } = req.body || {};
   if (!base64) throw new Error("base64 requerido");
   const jid = await resolveJid(sock, to);
+  if (req.body.typing !== false) await humanTyping(sock, jid, caption || "");
   const buffer = Buffer.from(base64, "base64");
   const mt = mimetype || "application/octet-stream";
   let content;

@@ -262,6 +262,28 @@ class WhatsappEvent(models.Model):
             return False
         P = self.env['ir.config_parameter'].sudo()
         Msg = self.env['whatsapp.message'].sudo()
+        Policy = self.env['whatsapp.policy']
+        # BAJA inmediata: se respeta antes que cualquier otra cosa.
+        if Policy.is_optout_text(message.body):
+            self.env['whatsapp.blocklist'].block(message.phone, message.partner_id, 'Pidió baja por WhatsApp', message.body)
+            try:
+                Msg.with_context(wa_skip_blocklist=True).queue(
+                    phone=message.phone, body='Entendido, no recibirá más mensajes de este número.',
+                    partner=None, res_model='whatsapp.message', res_id=message.id, send_now=True)
+            except Exception as e:  # noqa: BLE001
+                _logger.warning('[WHATSAPP] confirmación de baja no enviada: %s', e)
+            origin, seller = self._resolve_inbound_origin(message)
+            message.write({'seller_partner_id': seller.id if seller else False})
+            if seller and seller.phone:
+                try:
+                    Msg.queue(phone=seller.phone, partner=seller, res_model='whatsapp.message', res_id=message.id, send_now=True,
+                              body='🚫 El cliente *%s* (%s) pidió NO recibir WhatsApp de la cuenta de avisos. Cualquier contacto va por tu número.' % (
+                                  message.partner_id.display_name or message.pushname or 'Desconocido', self._wa_pretty_phone(message.phone)))
+                except Exception as e:  # noqa: BLE001
+                    _logger.warning('[WHATSAPP] aviso de baja al asesor no enviado: %s', e)
+            if origin and hasattr(origin, 'message_post'):
+                origin.message_post(body='El cliente pidió baja de WhatsApp ("%s"). Número agregado a la lista de baja.' % (message.body or '')[:80])
+            return True
         # Un usuario interno (vendedor contestando un reenvío) no es un cliente.
         internal = self.env['res.users'].sudo().search(
             [('share', '=', False), ('active', '=', True), ('partner_id.phone', 'ilike', message.phone[-10:])], limit=1)

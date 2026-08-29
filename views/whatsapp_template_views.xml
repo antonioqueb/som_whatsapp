@@ -19,7 +19,7 @@
                     <group string="Mensaje">
                         <field name="body" nolabel="1" placeholder="Hola {{ object.partner_id.name }}, tu pedido {{ object.name }} fue confirmado. Total: {{ object.amount_total }}."/>
                     </group>
-                    <div class="text-muted">Marcadores: <code>{{ object.campo }}</code> (registro), <code>{{ user.name }}</code>, <code>{{ ctx.get('dato') }}</code> (contexto extra al disparar).</div>
+                    <div class="text-muted">Variantes al azar: <code>{Hola|Buen día|Qué tal}</code>. Marcadores: <code>{{ object.campo }}</code> (registro), <code>{{ user.name }}</code>, <code>{{ ctx.get('dato') }}</code> (contexto extra al disparar).</div>
                 </sheet>
             </form>
         </field>

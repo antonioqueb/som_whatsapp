@@ -45,6 +45,33 @@
                             </div>
                         </setting>
                     </block>
+                    <block title="Anti-baneo" name="whatsapp_antiban_block">
+                        <setting string="Ritmo humano" help="Goteo con pausas aleatorias y 'escribiendo…' antes de cada mensaje; tope diario con rampa para números nuevos.">
+                            <div class="row mt8"><label for="wa_max_per_minute" class="col-lg-7 o_light_label"/><field name="wa_max_per_minute"/></div>
+                            <div class="row mt8"><label for="wa_jitter_min" class="col-lg-7 o_light_label"/><field name="wa_jitter_min"/></div>
+                            <div class="row mt8"><label for="wa_jitter_max" class="col-lg-7 o_light_label"/><field name="wa_jitter_max"/></div>
+                            <div class="row mt8"><label for="wa_daily_cap" class="col-lg-7 o_light_label"/><field name="wa_daily_cap"/></div>
+                            <div class="row mt8"><field name="wa_warmup"/></div>
+                        </setting>
+                        <setting string="Horario y prioridades" help="Fuera de ventana la cola espera; en domingo solo salen los urgentes (vencimientos). Los avisos de reservas se reparten al azar en la mañana.">
+                            <div class="row mt8"><label for="wa_window_start" class="col-lg-7 o_light_label"/><field name="wa_window_start"/></div>
+                            <div class="row mt8"><label for="wa_window_end" class="col-lg-7 o_light_label"/><field name="wa_window_end"/></div>
+                            <div class="row mt8"><field name="wa_sunday_urgent_only"/></div>
+                            <div class="row mt8"><label for="wa_hold_spread_minutes" class="col-lg-7 o_light_label"/><field name="wa_hold_spread_minutes"/></div>
+                        </setting>
+                        <setting string="Baja y detector de bloqueos" help="Quien escriba una palabra de baja no vuelve a recibir mensajes (lista de baja). Si 5 de 6 envíos fallan o los mensajes dejan de entregarse, la cuenta se pausa sola y avisa a los administradores.">
+                            <div class="row mt8"><label for="wa_optout_keywords" class="col-lg-12 o_light_label"/><field name="wa_optout_keywords" placeholder="BAJA,STOP,ALTO,NO ME ESCRIBAS"/></div>
+                            <div class="row mt8"><field name="wa_health_guard"/></div>
+                        </setting>
+                        <setting string="Del lado del teléfono (manual)" help="Lo que Meta pondera y no se puede hacer desde Odoo.">
+                            <ul class="mb0">
+                                <li>WhatsApp <b>Business</b> en el teléfono: nombre "SOM Group · Avisos", foto, descripción, dirección y horario.</li>
+                                <li>Que una persona use el número de vez en cuando desde el teléfono (leer, contestar algún chat).</li>
+                                <li>Un <b>segundo número</b> vinculado como cuenta adicional y calentado: si uno cae, la cola cambia sola a la otra cuenta conectada.</li>
+                                <li>No cerrar/abrir la sesión en horario activo; no vincular el número a otros bots.</li>
+                            </ul>
+                        </setting>
+                    </block>
                     <block title="Reservas (holds)" name="whatsapp_holds_block">
                         <setting string="Avisos de vencimiento" help="Vendedor: 2 días antes y el día del vencimiento. Cliente: la mañana del vencimiento (solo si tiene teléfono).">
                             <div class="row mt8">

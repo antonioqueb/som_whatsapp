@@ -29,7 +29,7 @@ class WhatsappTemplate(models.Model):
         rendered = self.with_context(**(extra_ctx or {}))._render_field(
             'body', [record.id], engine='inline_template',
             add_context={'ctx': extra_ctx or {}}, options={'post_process': False})
-        return (rendered.get(record.id) or '').strip()
+        return self.env['whatsapp.policy'].vary((rendered.get(record.id) or '').strip())
 
     def render_attachment(self, record):
         """(nombre, base64, mimetype) del reporte PDF, si la plantilla lo lleva."""
