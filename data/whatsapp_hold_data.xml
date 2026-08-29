@@ -32,7 +32,7 @@ Si el cliente sigue interesado, renuévala o conviértela en venta ahora. Al ven
     <record id="wa_template_hold_client" model="whatsapp.template">
         <field name="name">Reserva · cliente · vence hoy/mañana</field>
         <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
-        <field name="body">Hola {{ object.partner_id.name }}, le saluda {{ ctx.get('seller') }} de {{ object.company_id.name }}.
+        <field name="body">Hola {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
 
 Su reserva *{{ object.name }}*{{ ctx.get('job_suffix') }} vence *{{ ctx.get('when') }}* ({{ ctx.get('expiry') }}, hora de Monterrey).
 
@@ -40,7 +40,10 @@ Su reserva *{{ object.name }}*{{ ctx.get('job_suffix') }} vence *{{ ctx.get('whe
 
 Gran parte de nuestro material son piezas únicas: al vencer la reserva quedan disponibles de inmediato para cualquier otro cliente y no podemos garantizar piezas equivalentes después.
 
-Si desea extenderla o confirmar su pedido, respóndame por este medio{{ ctx.get('seller_phone_suffix') }}.</field>
+Para extenderla o confirmar su pedido, contacte directamente a su asesor:
+{{ ctx.get('seller_block') }}
+
+{{ ctx.get('notice') }}</field>
     </record>
 
     <record id="wa_event_hold_seller_t2" model="whatsapp.event">

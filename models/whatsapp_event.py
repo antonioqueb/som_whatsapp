@@ -110,7 +110,9 @@ class WhatsappEvent(models.Model):
                     continue
                 if not force and not ev._matches(record):
                     continue
-                body = ev.template_id.render_for(record, extra_ctx)
+                ctx = self._wa_base_ctx(record)
+                ctx.update(extra_ctx or {})
+                body = ev.template_id.render_for(record, ctx)
                 attachment = None
                 try:
                     attachment = ev.template_id.render_attachment(record)
@@ -128,10 +130,152 @@ class WhatsappEvent(models.Model):
                         _logger.warning('[WHATSAPP] %s → %s no encolado: %s', key, phone, e)
         return out
 
+    # ── contexto común para TODAS las plantillas ──
+    DEFAULT_NOTICE = ('⚠️ *Este número es exclusivo para notificaciones automáticas y no es atendido.* '
+                      'Para seguimiento, envío de comprobantes de pago o cualquier duda, '
+                      'comuníquese directamente con su asesor.')
+
+    @api.model
+    def _wa_link(self, phone, text=''):
+        phone = self.env['whatsapp.gateway'].normalize_phone(phone or '')
+        if not phone:
+            return ''
+        from urllib.parse import quote
+        return 'https://wa.me/%s%s' % (phone, ('?text=' + quote(text)) if text else '')
+
+    @api.model
+    def _wa_seller_partner(self, record):
+        """Asesor responsable del registro: user_id (venta, reserva…),
+        seller_partner_id (mensajes entrantes) o el vendedor del contacto."""
+        if record._name == 'whatsapp.message':
+            return record.seller_partner_id
+        user = getattr(record, 'user_id', False)
+        if user and user._name == 'res.users' and user.partner_id:
+            return user.partner_id
+        partner = getattr(record, 'partner_id', False)
+        if partner and getattr(partner, 'user_id', False):
+            return partner.user_id.partner_id
+        return self.env['res.partner']
+
+    @api.model
+    def _wa_base_ctx(self, record):
+        """Claves disponibles en cualquier plantilla vía ctx: client, client_phone,
+        client_link, seller, seller_phone, seller_link, seller_block, notice, ref, job_suffix."""
+        P = self.env['ir.config_parameter'].sudo()
+        GW = self.env['whatsapp.gateway']
+        partner = record.partner_id if record._name != 'whatsapp.message' else record.partner_id
+        client_phone = GW.normalize_phone((partner and partner.phone) or (record._name == 'whatsapp.message' and record.phone) or '')
+        ref = record.display_name or ''
+        if record._name == 'whatsapp.message' and record.res_model and record.res_id:
+            origin = self.env[record.res_model].sudo().browse(record.res_id).exists()
+            ref = origin.display_name if origin else ref
+        seller_partner = self._wa_seller_partner(record)
+        seller_phone = GW.normalize_phone(seller_partner.phone or '') if seller_partner else ''
+        seller_name = seller_partner.name or '' if seller_partner else ''
+        seller_link = self._wa_link(seller_phone, 'Hola, le escribo por %s.' % ref) if seller_phone else ''
+        if seller_name and seller_link:
+            seller_block = '👤 Su asesor: *%s*\n📱 +%s\n👉 Abrir chat: %s' % (seller_name, seller_phone, seller_link)
+        elif seller_name:
+            seller_block = '👤 Su asesor *%s* se pondrá en contacto con usted.' % seller_name
+        else:
+            seller_block = 'Un asesor se pondrá en contacto con usted.'
+        job = ''
+        for f in ('x_project_id', 'project_id'):
+            v = getattr(record, f, False)
+            if v and getattr(v, 'name', ''):
+                job = v.name
+                break
+        return {
+            'ref': ref,
+            'client': (partner and partner.display_name) or '',
+            'client_phone': client_phone,
+            'client_link': self._wa_link(client_phone) if client_phone else '',
+            'seller': seller_name,
+            'seller_phone': seller_phone,
+            'seller_link': seller_link,
+            'seller_block': seller_block,
+            'notice': P.get_param('som_whatsapp.notice_text') or self.DEFAULT_NOTICE,
+            'job': job or '—',
+            'job_suffix': (' del proyecto *%s*' % job) if job else '',
+        }
+
+    # ── entrantes: este número solo notifica; el seguimiento es con el asesor ──
+    @api.model
+    def _resolve_inbound_origin(self, message):
+        """(registro origen, asesor) para un mensaje entrante: el último saliente
+        a ese teléfono con registro origen manda; si no, el vendedor del contacto."""
+        Msg = self.env['whatsapp.message'].sudo()
+        phone = message.phone or ''
+        dom = [('direction', '=', 'out'), ('phone', '=', phone), ('res_model', '!=', False), ('res_id', '!=', 0)]
+        last = Msg.search(dom + [('res_model', '!=', 'whatsapp.message')], order='id desc', limit=1)
+        origin = self.env['res.partner']
+        if last and last.res_model in self.env:
+            origin = self.env[last.res_model].sudo().browse(last.res_id).exists()
+        seller = self._wa_seller_partner(origin) if origin else self.env['res.partner']
+        if not seller and message.partner_id and message.partner_id.user_id:
+            seller = message.partner_id.user_id.partner_id
+        return origin, seller
+
     @api.model
     def _on_inbound(self, message):
-        """Punto abierto: ruteo de mensajes entrantes (respuestas automáticas,
-        asignación a vendedor, etc.). Por ahora solo deja rastro."""
+        """Cliente escribe al número notificador → (1) se reenvía al asesor desde
+        este mismo número, con adjunto si lo traía; (2) al cliente se le responde
+        (con enfriamiento) que este número no se atiende y que el seguimiento es
+        con su asesor, con liga directa a su chat."""
+        if not message.phone:
+            return False
+        P = self.env['ir.config_parameter'].sudo()
+        Msg = self.env['whatsapp.message'].sudo()
+        # Un usuario interno (vendedor contestando un reenvío) no es un cliente.
+        internal = self.env['res.users'].sudo().search(
+            [('share', '=', False), ('active', '=', True), ('partner_id.phone', 'ilike', message.phone[-10:])], limit=1)
+        if internal:
+            return False
+        origin, seller = self._resolve_inbound_origin(message)
+        vals = {'seller_partner_id': seller.id if seller else False}
+        if origin:
+            vals.update({'res_model': origin._name, 'res_id': origin.id})
+        message.write(vals)
+        body_txt = (message.body or '').strip() or '[archivo adjunto sin texto]'
+        if origin and hasattr(origin, 'message_post'):
+            origin.message_post(body='WhatsApp del cliente al número notificador (%s): %s%s' % (
+                message.phone, body_txt[:500], ' · se reenvió a %s' % seller.name if seller else ' · SIN asesor para reenviar'))
+        ctx = {'client_text': body_txt[:1500]}
+        # (1) reenvío al asesor (o al número de respaldo)
+        forwarded = Msg
+        if seller and seller.phone:
+            forwarded = self.fire('inbound.forward_seller', message, extra_ctx=ctx)
+        else:
+            fallback = P.get_param('som_whatsapp.fallback_forward_phone') or ''
+            if fallback:
+                base = self._wa_base_ctx(message)
+                base.update(ctx)
+                text = ('📨 *Mensaje de cliente sin asesor asignado*\n👤 %s · %s\n📋 Ref: %s\n💬 "%s"\n\n'
+                        'Asigna un vendedor y contáctalo: %s') % (
+                    base['client'] or 'Desconocido', base['client_phone'], base['ref'] or '—', base['client_text'], base['client_link'])
+                try:
+                    forwarded = Msg.queue(phone=fallback, body=text, res_model='whatsapp.message', res_id=message.id)
+                except Exception as e:  # noqa: BLE001
+                    _logger.warning('[WHATSAPP] reenvío de respaldo no encolado: %s', e)
+        if forwarded and message.attachment_id:
+            for fw in forwarded:
+                try:
+                    Msg.queue(phone=fw.phone, body='📎 Adjunto del cliente %s' % (message.partner_id.display_name or message.phone),
+                              partner=fw.partner_id or None, attachment=message.attachment_id,
+                              res_model='whatsapp.message', res_id=message.id, send_now=False)
+                except Exception as e:  # noqa: BLE001
+                    _logger.warning('[WHATSAPP] adjunto no reenviado: %s', e)
+        # (2) auto-respuesta al cliente, una vez por ventana de enfriamiento
+        try:
+            hours = int(P.get_param('som_whatsapp.autoreply_cooldown_hours', '12') or 12)
+        except ValueError:
+            hours = 12
+        from datetime import timedelta
+        ev = self.sudo().search([('key', '=', 'inbound.client_autoreply')], limit=1)
+        recent = Msg.search_count([('direction', '=', 'out'), ('phone', '=', message.phone), ('event_id', '=', ev.id),
+                                   ('create_date', '>=', fields.Datetime.now() - timedelta(hours=hours))]) if ev else 0
+        if not recent:
+            self.fire('inbound.client_autoreply', message, extra_ctx=ctx)
         return True
 
     def action_test_send(self):

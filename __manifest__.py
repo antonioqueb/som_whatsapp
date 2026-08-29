@@ -1,6 +1,6 @@
 {
     'name': 'SOM WhatsApp (Baileys)',
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.2.0',
     'category': 'Tools',
     'summary': 'Notificaciones WhatsApp vía gateway Baileys con API HTTP estándar; puntos de conexión para enlazar procesos',
     'description': """
@@ -18,7 +18,7 @@ WhatsApp para Odoo (SOM)
     'author': 'Alphaqueb Consulting',
     'website': 'https://alphaqueb.com',
     'license': 'LGPL-3',
-    'depends': ['base', 'mail', 'web', 'stock_lot_dimensions'],
+    'depends': ['base', 'mail', 'web', 'sale', 'stock_lot_dimensions'],
     'data': [
         'security/security.xml',
         'security/ir.model.access.csv',
@@ -31,6 +31,9 @@ WhatsApp para Odoo (SOM)
         'views/res_partner_views.xml',
         'wizard/whatsapp_compose_views.xml',
         'data/whatsapp_hold_data.xml',
+        'data/whatsapp_sale_data.xml',
+        'data/whatsapp_inbound_data.xml',
+        'views/sale_order_views.xml',
         'views/stock_lot_hold_order_views.xml',
         'views/menus.xml',
     ],

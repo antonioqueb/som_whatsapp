@@ -11,6 +11,16 @@ class ResConfigSettings(models.TransientModel):
                                    help='Debe coincidir con WEBHOOK_TOKEN del gateway.')
     wa_default_country_code = fields.Char(string='Código de país por defecto', config_parameter='som_whatsapp.default_country_code', default='52')
     wa_timeout = fields.Char(string='Timeout (s)', config_parameter='som_whatsapp.timeout', default='20')
+    wa_notice_text = fields.Text(
+        string='Aviso "solo notificaciones"', config_parameter='som_whatsapp.notice_text',
+        help='Texto que va en todo mensaje al cliente: este número no se atiende, el seguimiento es con su asesor. '
+             'Vacío = texto por defecto.')
+    wa_autoreply_cooldown_hours = fields.Integer(
+        string='Enfriamiento de auto-respuesta (h)', config_parameter='som_whatsapp.autoreply_cooldown_hours', default=12,
+        help='Al cliente que escribe a este número se le responde una vez por esta ventana; su mensaje SIEMPRE se reenvía al asesor.')
+    wa_fallback_forward_phone = fields.Char(
+        string='Número de respaldo (sin asesor)', config_parameter='som_whatsapp.fallback_forward_phone',
+        help='Si un cliente escribe y no se identifica asesor, el mensaje se reenvía aquí (p. ej. gerencia de ventas).')
     wa_hold_morning_hour = fields.Integer(
         string='Hora de envío (reservas)', config_parameter='som_whatsapp_holds.morning_hour', default=9,
         help='Hora local (Monterrey) a partir de la cual el cron manda los avisos de reservas. '

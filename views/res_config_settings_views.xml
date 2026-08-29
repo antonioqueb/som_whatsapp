@@ -31,6 +31,20 @@
                             </div>
                         </setting>
                     </block>
+                    <block title="Seguimiento con el asesor" name="whatsapp_followup_block">
+                        <setting string="Número intermediario" help="Este número solo notifica. Todo mensaje al cliente indica que el seguimiento, pagos y dudas son con su asesor (liga directa a su chat). Si el cliente escribe aquí, se le reenvía al asesor y se le responde automáticamente.">
+                            <div class="row mt8">
+                                <label for="wa_notice_text" class="col-lg-12 o_light_label"/>
+                                <field name="wa_notice_text" placeholder="⚠️ Este número es exclusivo para notificaciones automáticas y no es atendido…"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="wa_autoreply_cooldown_hours" class="col-lg-6 o_light_label"/><field name="wa_autoreply_cooldown_hours"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="wa_fallback_forward_phone" class="col-lg-6 o_light_label"/><field name="wa_fallback_forward_phone"/>
+                            </div>
+                        </setting>
+                    </block>
                     <block title="Reservas (holds)" name="whatsapp_holds_block">
                         <setting string="Avisos de vencimiento" help="Vendedor: 2 días antes y el día del vencimiento. Cliente: la mañana del vencimiento (solo si tiene teléfono).">
                             <div class="row mt8">

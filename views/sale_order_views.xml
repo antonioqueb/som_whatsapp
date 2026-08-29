@@ -1,0 +1,25 @@
+<odoo>
+    <record id="view_order_form_whatsapp" model="ir.ui.view">
+        <field name="name">sale.order.form.whatsapp</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_wa_send_confirmation" type="object" string="WhatsApp al cliente" icon="fa-whatsapp"
+                        invisible="state not in ('sale', 'done')" groups="som_whatsapp.group_whatsapp_user"
+                        help="Envía (o reenvía) al cliente la confirmación con el PDF y la indicación de seguimiento con su asesor."/>
+            </xpath>
+            <xpath expr="//field[@name='partner_id'][not(ancestor::field)]" position="after">
+                <field name="x_wa_client_notified" invisible="state not in ('sale', 'done')" readonly="1" groups="som_whatsapp.group_whatsapp_user"/>
+            </xpath>
+        </field>
+    </record>
+    <record id="action_whatsapp_compose_sale" model="ir.actions.act_window">
+        <field name="name">Enviar WhatsApp</field>
+        <field name="res_model">whatsapp.compose</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="sale.model_sale_order"/>
+        <field name="binding_view_types">form</field>
+    </record>
+</odoo>

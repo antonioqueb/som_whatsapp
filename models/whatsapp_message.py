@@ -42,6 +42,8 @@ class WhatsappMessage(models.Model):
     template_id = fields.Many2one('whatsapp.template', string='Plantilla', ondelete='set null')
     user_id = fields.Many2one('res.users', string='Enviado por', default=lambda self: self.env.user)
     company_id = fields.Many2one('res.company', default=lambda self: self.env.company)
+    seller_partner_id = fields.Many2one('res.partner', string='Vendedor (seguimiento)', index=True,
+                                        help='Entrantes: asesor al que se reenvió el mensaje del cliente.')
     retry_count = fields.Integer(default=0)
 
     def _compute_res_ref(self):
