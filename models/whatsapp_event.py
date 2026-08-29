@@ -166,13 +166,15 @@ class WhatsappEvent(models.Model):
             partner = False
         client_phone = GW.normalize_phone((partner and partner.phone) or (record._name == 'whatsapp.message' and record.phone) or '')
         ref = record.display_name or ''
-        if record._name == 'whatsapp.message' and record.res_model and record.res_id:
-            origin = self.env[record.res_model].sudo().browse(record.res_id).exists()
-            ref = origin.display_name if origin else ref
+        if record._name == 'whatsapp.message':
+            ref = ''
+            if record.res_model and record.res_id and record.res_model != 'whatsapp.message':
+                origin = self.env[record.res_model].sudo().browse(record.res_id).exists()
+                ref = origin.display_name if origin else ''
         seller_partner = self._wa_seller_partner(record)
         seller_phone = GW.normalize_phone(seller_partner.phone or '') if seller_partner else ''
         seller_name = seller_partner.name or '' if seller_partner else ''
-        seller_link = self._wa_link(seller_phone, 'Hola, le escribo por %s.' % ref) if seller_phone else ''
+        seller_link = self._wa_link(seller_phone, ('Hola, le escribo por %s.' % ref) if ref else 'Hola, le escribo para dar seguimiento.') if seller_phone else ''
         if seller_name and seller_link:
             seller_block = 'Seguimiento y pagos con su asesor *%s*: %s' % (seller_name, seller_link)
         elif seller_name:

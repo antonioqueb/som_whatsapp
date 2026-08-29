@@ -47,7 +47,10 @@ class StockLotHoldOrder(models.Model):
 
     def _wa_link(self):
         self.ensure_one()
-        return '%s/odoo/stock.lot.hold.order/%d' % (self.get_base_url().rstrip('/'), self.id)
+        base = (self.get_base_url() or '').rstrip('/')
+        if base.startswith('http://') and 'localhost' not in base and '127.0.0.1' not in base:
+            base = 'https://' + base[7:]
+        return '%s/odoo/stock.lot.hold.order/%d' % (base, self.id)
 
     def _wa_lines_text(self):
         """Resumen en texto plano del material (WhatsApp no lleva HTML)."""
