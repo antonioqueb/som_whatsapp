@@ -137,6 +137,12 @@ class WhatsappMessage(models.Model):
     # ── entrada por webhook ──
     @api.model
     def _inbound_from_webhook(self, data):
+        # Baileys puede entregar el mismo mensaje dos veces (reintentos/sync):
+        # el id de WhatsApp es la llave.
+        if data.get('id'):
+            dup = self.sudo().search([('direction', '=', 'in'), ('wa_message_id', '=', data['id'])], limit=1)
+            if dup:
+                return dup
         acc = self.env['whatsapp.account'].sudo().search([('session_key', '=', data.get('session'))], limit=1)
         phone = self.env['whatsapp.gateway'].normalize_phone(data.get('from') or '')
         partner = self.env['res.partner'].sudo().search([('phone', 'ilike', phone[-10:])], limit=1) if phone else self.env['res.partner']

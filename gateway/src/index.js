@@ -64,6 +64,14 @@ function sessionState(id) {
   return { session: id, status: s.status, phone: s.phone || null, qr: s.qr || null, qr_at: s.qrAt || null };
 }
 
+// Ids ya entregados a Odoo (memoria acotada) para no duplicar webhooks.
+const seenIds = new Set();
+function rememberId(id) {
+  if (!id) return;
+  seenIds.add(id);
+  if (seenIds.size > 5000) { const first = seenIds.values().next().value; seenIds.delete(first); }
+}
+
 function normalizePhone(raw) {
   let d = String(raw || "").replace(/\D/g, "");
   if (!d) return "";
@@ -147,13 +155,19 @@ async function startSession(id) {
       if (!m.message || m.key.fromMe) continue;
       const jid = m.key.remoteJid || "";
       if (jid.endsWith("@g.us") || jid === "status@broadcast") continue; // grupos/estados: fuera
+      if (m.key.id && seenIds.has(m.key.id)) continue; // Baileys reentrega (sync/reintentos)
+      rememberId(m.key.id);
+      // Chats @lid (identidad nueva de WhatsApp): el teléfono real viaja en senderPn.
+      const pnJid = jid.endsWith("@lid") ? (m.key.senderPn || m.key.participantPn || "") : jid;
+      const from = (pnJid || "").split("@")[0].split(":")[0];
       const msg = m.message;
       const text = msg.conversation || msg.extendedTextMessage?.text || msg.imageMessage?.caption
         || msg.videoMessage?.caption || msg.documentMessage?.caption || "";
       const mediaNode = msg.imageMessage || msg.documentMessage || msg.audioMessage || msg.videoMessage;
       const payload = {
         type: "message", session: id, id: m.key.id, jid,
-        from: jid.split("@")[0], text,
+        from, lid: jid.endsWith("@lid") ? jid.split("@")[0] : null,
+        pushname: m.pushName || null, text,
         timestamp: Number(m.messageTimestamp) * 1000 || Date.now(),
         has_media: !!mediaNode, mimetype: mediaNode?.mimetype || null,
         filename: msg.documentMessage?.fileName || null,
