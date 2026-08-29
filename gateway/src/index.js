@@ -151,10 +151,10 @@ async function startSession(id) {
   fs.mkdirSync(dir, { recursive: true });
   const { state, saveCreds } = await useMultiFileAuthState(dir);
   const sentStore = makeSentStore(dir);
-  entry.sentStore = sentStore;
   const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: undefined }));
 
   const entry = existing || { status: "starting", phone: null, qr: null, qrAt: null };
+  entry.sentStore = sentStore;
   entry.starting = true;
   entry.status = "starting";
   sessions.set(id, entry);
