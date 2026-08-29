@@ -4,6 +4,11 @@
         <field name="model">stock.lot.hold.order</field>
         <field name="inherit_id" ref="stock_lot_dimensions.view_stock_lot_hold_order_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_wa_open_compose" type="object" string="WhatsApp al cliente" icon="fa-whatsapp"
+                        invisible="state == 'cancel'" groups="som_whatsapp.group_whatsapp_user"
+                        help="Elige el documento de la reserva (resumen, detalle, sin precios…) y el texto; el PDF va adjunto."/>
+            </xpath>
             <xpath expr="//notebook" position="inside">
                 <page string="WhatsApp" groups="som_whatsapp.group_whatsapp_user">
                     <group>

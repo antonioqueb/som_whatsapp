@@ -171,6 +171,12 @@ class StockLotHoldOrder(models.Model):
                 _logger.exception('[WA HOLD] aviso fallido para %s', order.name)
                 self.env.cr.rollback()
 
+    def action_wa_open_compose(self):
+        """Botón: enviar al cliente el documento de la reserva (resumen / detalle / sin precios)."""
+        self.ensure_one()
+        return self.env['whatsapp.compose'].open_for(self, 'som_whatsapp.wa_template_hold_document',
+                                                     'stock_lot_dimensions.action_report_stock_lot_hold_order_summary')
+
     def action_wa_send_seller_now(self):
         """Botón: manda ahora mismo el aviso del día al vendedor (prueba/forzado)."""
         for order in self:

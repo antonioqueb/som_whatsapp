@@ -189,6 +189,12 @@ class WhatsappEvent(models.Model):
             seller_block = 'Su asesor *%s* le dará seguimiento.' % seller_name
         else:
             seller_block = 'Un asesor le dará seguimiento.'
+        if seller_name and seller_phone:
+            seller_contact = '*%s*: %s' % (seller_name, self._wa_pretty_phone(seller_phone))
+        elif seller_name:
+            seller_contact = '*%s*' % seller_name
+        else:
+            seller_contact = 'un asesor de %s' % (record.company_id.name if getattr(record, 'company_id', False) else 'SOM')
         job = ''
         for f in ('x_project_id', 'project_id'):
             v = getattr(record, f, False)
@@ -205,10 +211,21 @@ class WhatsappEvent(models.Model):
             'seller_phone_pretty': self._wa_pretty_phone(seller_phone),
             'seller_link': seller_link,
             'seller_block': seller_block,
+            'seller_contact': seller_contact,
             'notice': P.get_param('som_whatsapp.notice_text') or self.DEFAULT_NOTICE,
             'job': job or '—',
             'job_suffix': (' del proyecto *%s*' % job) if job else '',
         }
+
+    @api.model
+    def render_template(self, template, record, extra_ctx=None):
+        """Texto final con el contexto completo (base + el del modelo, si define
+        `_wa_ctx`). Lo usa el compositor manual."""
+        ctx = self._wa_base_ctx(record)
+        if hasattr(record, '_wa_ctx'):
+            ctx.update(record._wa_ctx())
+        ctx.update(extra_ctx or {})
+        return template.render_for(record, ctx)
 
     # ── entrantes: este número solo notifica; el seguimiento es con el asesor ──
     @api.model

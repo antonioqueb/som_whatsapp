@@ -11,8 +11,9 @@
                         <field name="account_id" options="{'no_create': True}"/>
                     </group>
                     <group>
-                        <field name="template_id" options="{'no_create': True}"/>
                         <field name="res_model" invisible="1"/><field name="res_id" invisible="1"/>
+                        <field name="report_id" options="{'no_create': True, 'no_open': True}" invisible="not res_model or res_model == 'res.partner'"/>
+                        <field name="template_id" options="{'no_create': True}" domain="[('model_id.model', '=', res_model)]"/>
                     </group>
                 </group>
                 <field name="body" placeholder="Escribe el mensaje…"/>

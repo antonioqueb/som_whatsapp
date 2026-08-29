@@ -1,6 +1,6 @@
 {
     'name': 'SOM WhatsApp (Baileys)',
-    'version': '19.0.1.3.2',
+    'version': '19.0.1.4.0',
     'category': 'Tools',
     'summary': 'Notificaciones WhatsApp vía gateway Baileys con API HTTP estándar; puntos de conexión para enlazar procesos',
     'description': """

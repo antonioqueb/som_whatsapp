@@ -64,6 +64,12 @@ class SaleOrder(models.Model):
                 _logger.exception('[WHATSAPP] confirmación de %s no enviada', order.name)
                 order.message_post(body='WhatsApp de confirmación falló: %s' % e)
 
+    def action_wa_open_compose(self):
+        """Botón: elegir documento (resumen / detalle / sin precios…) y texto antes de enviar."""
+        self.ensure_one()
+        return self.env['whatsapp.compose'].open_for(self, 'som_whatsapp.wa_template_sale_confirmed',
+                                                     'sale.action_report_saleorder')
+
     def action_wa_send_confirmation(self):
         """Botón: (re)enviar al cliente el aviso de confirmación con el PDF."""
         self._wa_notify_client_confirmed(force=True)

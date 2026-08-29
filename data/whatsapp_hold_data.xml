@@ -5,7 +5,7 @@
         <field name="body">⏳ *Reserva {{ object.name }} vence {{ ctx.get('when') }}* · {{ ctx.get('expiry') }}
 Cliente: {{ ctx.get('client') }} · Job: {{ ctx.get('job') }}
 {{ ctx.get('lines') }}
-🔗 {{ ctx.get('link') }}</field>
+Al vencer, otro vendedor puede tomarlas. 🔗 {{ ctx.get('link') }}</field>
     </record>
     <record id="wa_template_hold_seller_t0" model="whatsapp.template">
         <field name="name">Reserva · vendedor · vence hoy</field>
@@ -20,8 +20,16 @@ Renuévala o conviértela en venta; al vencer, el material se libera.
         <field name="name">Reserva · cliente · vence hoy/mañana</field>
         <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
         <field name="body">Hola {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
-Su reserva *{{ object.name }}*{{ ctx.get('job_suffix') }} ({{ ctx.get('lines_short') }}) vence {{ ctx.get('when') }}, {{ ctx.get('expiry') }} hora de Monterrey; al vencer, el material se libera.
-{{ ctx.get('seller_block') }}</field>
+Su reserva *{{ object.name }}* ({{ ctx.get('lines_short') }}) vence {{ ctx.get('when') }} a las {{ ctx.get('expiry_time') }}. Son piezas únicas: al vencer quedan libres para otro cliente y no podemos reponerlas.
+Para extenderla o confirmar su pedido, su asesor {{ ctx.get('seller_contact') }}.</field>
+    </record>
+
+    <record id="wa_template_hold_document" model="whatsapp.template">
+        <field name="name">Reserva · cliente · documento (envío manual)</field>
+        <field name="model_id" ref="stock_lot_dimensions.model_stock_lot_hold_order"/>
+        <field name="body">Hola {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
+Le compartimos el documento de su reserva *{{ object.name }}* ({{ ctx.get('lines_short') }}), apartada solo hasta el {{ ctx.get('expiry') }} hora de Monterrey. Son piezas únicas: después de esa fecha quedan libres para otro cliente.
+Para confirmar o extender, su asesor {{ ctx.get('seller_contact') }}.</field>
     </record>
 
     <record id="wa_event_hold_seller_t2" model="whatsapp.event">

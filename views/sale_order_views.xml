@@ -5,9 +5,9 @@
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
             <xpath expr="//header" position="inside">
-                <button name="action_wa_send_confirmation" type="object" string="WhatsApp al cliente" icon="fa-whatsapp"
-                        invisible="state not in ('sale', 'done')" groups="som_whatsapp.group_whatsapp_user"
-                        help="Envía (o reenvía) al cliente la confirmación con el PDF y la indicación de seguimiento con su asesor."/>
+                <button name="action_wa_open_compose" type="object" string="WhatsApp al cliente" icon="fa-whatsapp"
+                        invisible="state == 'cancel'" groups="som_whatsapp.group_whatsapp_user"
+                        help="Elige el documento (resumen, detalle, sin precios…) y el texto; el PDF va adjunto."/>
             </xpath>
             <xpath expr="//field[@name='partner_id'][not(ancestor::field)]" position="after">
                 <field name="x_wa_client_notified" invisible="state not in ('sale', 'done')" readonly="1" groups="som_whatsapp.group_whatsapp_user"/>
