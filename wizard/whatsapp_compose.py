@@ -96,5 +96,7 @@ class WhatsappCompose(models.TransientModel):
                             res_model=self.res_model, res_id=self.res_id, template=self.template_id or None, send_now=True)
         if msg.state == 'failed':
             raise UserError(_('No se pudo enviar: %s') % (msg.error or ''))
+        if self.res_model == 'sale.order' and self.res_id:
+            self.env['sale.order'].browse(self.res_id).with_context(tracking_disable=True).write({'x_wa_client_notified': True})
         return {'type': 'ir.actions.client', 'tag': 'display_notification',
                 'params': {'title': 'WhatsApp', 'type': 'success', 'message': _('Mensaje enviado a %s') % msg.phone, 'next': {'type': 'ir.actions.act_window_close'}}}

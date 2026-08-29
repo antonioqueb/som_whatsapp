@@ -10,22 +10,13 @@ KEY_ORDER_CONFIRMED = 'sale.order.confirmed'
 class SaleOrder(models.Model):
     _inherit = 'sale.order'
 
-    x_wa_client_notified = fields.Boolean(string='WhatsApp de confirmación enviado', copy=False)
+    x_wa_client_notified = fields.Boolean(string='WhatsApp de confirmación enviado', copy=False,
+                                          help='Se marca al enviar manualmente la confirmación desde el botón.')
 
-    def write(self, vals):
-        # Órdenes que pasan a confirmadas en esta escritura (botón Confirmar o
-        # "nace confirmada"): el cliente recibe el aviso sin que nadie haga nada.
-        # OJO: otros módulos hacen sale→draft→sale como estado transitorio (cambio
-        # de lista de precios en inventory_shopping_cart, con tracking_disable);
-        # eso NO es una confirmación: la bandera y el candado temporal lo evitan.
-        to_notify = self.env['sale.order']
-        if vals.get('state') == 'sale' and not self.env.context.get('tracking_disable'):
-            to_notify = self.filtered(lambda o: o.state != 'sale' and not o.x_wa_client_notified)
-        res = super().write(vals)
-        if to_notify:
-            to_notify = to_notify.filtered(lambda o: o.state == 'sale' and not o.x_wa_client_notified)
-            to_notify._wa_notify_client_confirmed()
-        return res
+    # Sin envío automático al confirmar (decisión del cliente, 29 ago 2026):
+    # el aviso de venta sale SOLO desde el botón "WhatsApp al cliente", donde
+    # el vendedor elige el documento. `_wa_notify_client_confirmed` se conserva
+    # como punto de conexión por si algún día se quiere reactivar.
 
     def _wa_recently_notified(self, minutes=10):
         """Candado extra contra duplicados: ya hay un aviso de confirmación de

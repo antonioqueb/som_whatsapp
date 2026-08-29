@@ -15,6 +15,6 @@ Su pedido *{{ object.name }}*{{ ctx.get('job_suffix') }} quedó confirmado; adju
         <field name="recipient_mode">partner_field</field>
         <field name="recipient_path">partner_id</field>
         <field name="trigger">manual</field>
-        <field name="notes">Se dispara solo al confirmar la orden (o cuando nace confirmada). Cambia el reporte adjunto en la plantilla si prefieres el detallado. Reenvío manual: botón "WhatsApp al cliente" en la orden.</field>
+        <field name="notes">Envío MANUAL: botón "WhatsApp al cliente" en la orden (el vendedor elige el documento). No se dispara al confirmar.</field>
     </record>
 </odoo>

@@ -33,7 +33,7 @@ Endpoints: `GET /health`, `POST /sessions/:id/start`, `GET /sessions/:id/status`
 - Cron horario `WhatsApp: avisos de reservas`; hora de envío en Ajustes › WhatsApp › Reservas. Renovar re-arma los avisos.
 
 ## Venta confirmada y seguimiento con el asesor (número intermediario)
-- Al confirmar una orden (o al nacer confirmada) el cliente recibe WhatsApp con el PDF (`sale.order.confirmed`), el aviso de que este número NO se atiende y la liga directa al chat de su asesor (`wa.me/<vendedor>?text=…`). Botón "WhatsApp al cliente" para reenviar.
+- Venta: envío MANUAL desde el botón "WhatsApp al cliente" (asistente: documento a adjuntar + texto). No hay envío automático al confirmar. Al cliente se le indica nombre y número de su asesor (sin ligas).
 - Toda plantilla dispone de `ctx.seller_block`, `ctx.notice`, `ctx.seller_link`, `ctx.client_link`, `ctx.ref`, `ctx.job_suffix`.
 - Entrantes (`whatsapp.event._on_inbound`): el mensaje del cliente se reenvía al asesor desde el mismo número (`inbound.forward_seller`, adjuntos incluidos) y al cliente se le responde una vez por ventana (`inbound.client_autoreply`) reiterando que el seguimiento es con su asesor. Usuarios internos no reciben auto-respuesta. Sin asesor → número de respaldo (Ajustes).
 - Legado eliminado: wizard `som.whatsapp.send` (hoja nativa de compartir) de inventory_shopping_cart.
