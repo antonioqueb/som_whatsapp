@@ -9,7 +9,7 @@ Job: {{ ctx.get('job') }}
 
 {{ ctx.get('lines_compact') }}
 
-Contacta al cliente para renovar o convertir en venta.</field>
+Contacta al cliente para convertir en venta.</field>
     </record>
     <record id="wa_template_hold_seller_t0" model="whatsapp.template">
         <field name="name">Reserva · vendedor · vence hoy</field>
@@ -21,7 +21,7 @@ Job: {{ ctx.get('job') }}
 
 {{ ctx.get('lines_compact') }}
 
-Al vencer, el material se libera. Contacta al cliente hoy para renovar o convertir en venta.</field>
+Al vencer, el material se libera. Contacta al cliente hoy para convertir en venta.</field>
     </record>
     <record id="wa_template_hold_client" model="whatsapp.template">
         <field name="name">Reserva · cliente · vence hoy/mañana</field>
@@ -33,7 +33,7 @@ Su reserva *{{ object.name }}* vence *hoy a las {{ ctx.get('expiry_time') }}*.
 
 {Son piezas únicas|Se trata de piezas únicas}: al vencer quedan libres para otro cliente.
 
-Para extender o confirmar, {{ ctx.get('followup_contact') }}</field>
+Para confirmar, {{ ctx.get('followup_contact') }}</field>
     </record>
 
     <record id="wa_template_hold_document" model="whatsapp.template">
@@ -46,7 +46,7 @@ Para extender o confirmar, {{ ctx.get('followup_contact') }}</field>
 
 Son piezas únicas: después de esa fecha quedan libres para otro cliente.
 
-Para confirmar o extender, {{ ctx.get('followup_contact') }}</field>
+Para confirmar, {{ ctx.get('followup_contact') }}</field>
     </record>
 
     <record id="wa_event_hold_seller_t2" model="whatsapp.event">

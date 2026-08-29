@@ -15,7 +15,7 @@ Su reserva *{{ object.name }}* vence *hoy a las {{ ctx.get('expiry_time') }}*.
 
 {Son piezas únicas|Se trata de piezas únicas}: al vencer quedan libres para otro cliente.
 
-Para extender o confirmar, {{ ctx.get('followup_contact') }}"""
+Para confirmar, {{ ctx.get('followup_contact') }}"""
 
 HOLD_DOCUMENT = """{Hola|Buen día|Qué tal} {{ object.partner_id.name }}, le saluda {{ object.company_id.name }}.
 
@@ -24,7 +24,7 @@ HOLD_DOCUMENT = """{Hola|Buen día|Qué tal} {{ object.partner_id.name }}, le sa
 
 Son piezas únicas: después de esa fecha quedan libres para otro cliente.
 
-Para confirmar o extender, {{ ctx.get('followup_contact') }}"""
+Para confirmar, {{ ctx.get('followup_contact') }}"""
 
 HOLD_SELLER_T2 = """🔒 Aviso interno · Reserva *{{ object.name }}* vence {{ ctx.get('when') }} ({{ ctx.get('expiry') }})
 
@@ -33,7 +33,7 @@ Job: {{ ctx.get('job') }}
 
 {{ ctx.get('lines_compact') }}
 
-Contacta al cliente para renovar o convertir en venta."""
+Contacta al cliente para convertir en venta."""
 
 HOLD_SELLER_T0 = """🔒 Aviso interno · Reserva *{{ object.name }}* vence *hoy a las {{ ctx.get('expiry_time') }}*
 
@@ -42,7 +42,7 @@ Job: {{ ctx.get('job') }}
 
 {{ ctx.get('lines_compact') }}
 
-Al vencer, el material se libera. Contacta al cliente hoy para renovar o convertir en venta."""
+Al vencer, el material se libera. Contacta al cliente hoy para convertir en venta."""
 
 INBOUND_AUTOREPLY = """{{ ctx.get('notice') }}
 
