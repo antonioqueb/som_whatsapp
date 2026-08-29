@@ -131,9 +131,7 @@ class WhatsappEvent(models.Model):
         return out
 
     # ── contexto común para TODAS las plantillas ──
-    DEFAULT_NOTICE = ('⚠️ *Este número es exclusivo para notificaciones automáticas y no es atendido.* '
-                      'Para seguimiento, envío de comprobantes de pago o cualquier duda, '
-                      'comuníquese directamente con su asesor.')
+    DEFAULT_NOTICE = 'Este número es exclusivo para notificaciones automáticas y no es atendido.'
 
     @api.model
     def _wa_link(self, phone, text=''):
@@ -176,11 +174,11 @@ class WhatsappEvent(models.Model):
         seller_name = seller_partner.name or '' if seller_partner else ''
         seller_link = self._wa_link(seller_phone, 'Hola, le escribo por %s.' % ref) if seller_phone else ''
         if seller_name and seller_link:
-            seller_block = '👤 Su asesor: *%s*\n📱 +%s\n👉 Abrir chat: %s' % (seller_name, seller_phone, seller_link)
+            seller_block = 'Seguimiento y pagos con su asesor *%s*: %s' % (seller_name, seller_link)
         elif seller_name:
-            seller_block = '👤 Su asesor *%s* se pondrá en contacto con usted.' % seller_name
+            seller_block = 'Su asesor *%s* le dará seguimiento.' % seller_name
         else:
-            seller_block = 'Un asesor se pondrá en contacto con usted.'
+            seller_block = 'Un asesor le dará seguimiento.'
         job = ''
         for f in ('x_project_id', 'project_id'):
             v = getattr(record, f, False)
@@ -189,7 +187,7 @@ class WhatsappEvent(models.Model):
                 break
         return {
             'ref': ref,
-            'client': (partner and partner.display_name) or '',
+            'client': (partner and partner.display_name) or (record._name == 'whatsapp.message' and record.pushname) or '',
             'client_phone': client_phone,
             'client_link': self._wa_link(client_phone) if client_phone else '',
             'seller': seller_name,

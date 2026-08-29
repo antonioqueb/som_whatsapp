@@ -42,6 +42,7 @@ class WhatsappMessage(models.Model):
     template_id = fields.Many2one('whatsapp.template', string='Plantilla', ondelete='set null')
     user_id = fields.Many2one('res.users', string='Enviado por', default=lambda self: self.env.user)
     company_id = fields.Many2one('res.company', default=lambda self: self.env.company)
+    pushname = fields.Char(string='Nombre en WhatsApp', help='Nombre que el remitente muestra en WhatsApp (entrantes).')
     seller_partner_id = fields.Many2one('res.partner', string='Vendedor (seguimiento)', index=True,
                                         help='Entrantes: asesor al que se reenvió el mensaje del cliente.')
     retry_count = fields.Integer(default=0)
@@ -149,7 +150,7 @@ class WhatsappMessage(models.Model):
         vals = {
             'direction': 'in', 'state': 'received', 'account_id': acc.id,
             'partner_id': partner.id, 'phone': phone, 'jid': data.get('jid'),
-            'body': data.get('text') or '', 'wa_message_id': data.get('id'),
+            'body': data.get('text') or '', 'wa_message_id': data.get('id'), 'pushname': data.get('pushname') or False,
             'status_date': fields.Datetime.now(),
         }
         if data.get('base64'):

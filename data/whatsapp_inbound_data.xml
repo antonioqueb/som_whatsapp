@@ -2,23 +2,15 @@
     <record id="wa_template_inbound_autoreply" model="whatsapp.template">
         <field name="name">Entrante · auto-respuesta al cliente</field>
         <field name="model_id" ref="som_whatsapp.model_whatsapp_message"/>
-        <field name="body">Gracias por su mensaje.
-
-{{ ctx.get('notice') }}
-
-{{ ctx.get('seller_block') }}
-
-Su mensaje ya fue turnado a su asesor, quien se pondrá en contacto con usted formalmente en breve.</field>
+        <field name="body">{{ ctx.get('notice') }} Su mensaje fue turnado a su asesor.
+{{ ctx.get('seller_block') }}</field>
     </record>
     <record id="wa_template_inbound_forward" model="whatsapp.template">
         <field name="name">Entrante · reenvío al asesor</field>
         <field name="model_id" ref="som_whatsapp.model_whatsapp_message"/>
-        <field name="body">📨 *Mensaje de cliente en el número notificador*
-👤 {{ ctx.get('client') or 'Desconocido' }} · +{{ ctx.get('client_phone') }}
-📋 Ref: {{ ctx.get('ref') or '—' }}
-💬 "{{ ctx.get('client_text') }}"
-
-Ya se le informó que el seguimiento es contigo. Escríbele: {{ ctx.get('client_link') }}</field>
+        <field name="body">📨 Mensaje del cliente *{{ ctx.get('client') or 'Desconocido' }}* (+{{ ctx.get('client_phone') }}){{ ctx.get('ref') and (' sobre ' + ctx.get('ref')) or '' }}:
+"{{ ctx.get('client_text') }}"
+Ya se le indicó que el seguimiento es contigo. Responder: {{ ctx.get('client_link') }}</field>
     </record>
     <record id="wa_event_inbound_autoreply" model="whatsapp.event">
         <field name="name">Cliente escribe → auto-respuesta</field>

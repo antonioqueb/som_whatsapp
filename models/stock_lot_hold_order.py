@@ -69,6 +69,16 @@ class StockLotHoldOrder(models.Model):
             return ''
         return '\n'.join(rows) + '\n*Total: %d placa(s) · %.2f m²*' % (placas, m2)
 
+    def _wa_lines_short(self):
+        """Una línea: '3 productos · 22 placas · 105.14 m²'."""
+        self.ensure_one()
+        lines = self.hold_line_ids.filtered(lambda l: l.product_id.type != 'service')
+        placas = sum(len(l.lot_ids) for l in lines)
+        m2 = sum((l.cantidad_m2 or 0.0) for l in lines)
+        if not lines:
+            return ''
+        return '%d producto(s) · %d placa(s) · %.2f m²' % (len(lines), placas, m2)
+
     def _wa_ctx(self, when_text=''):
         self.ensure_one()
         exp = self._wa_local_expiry()
@@ -86,6 +96,7 @@ class StockLotHoldOrder(models.Model):
             'expiry_day': self._wa_fmt(exp, with_time=False),
             'expiry_time': exp.strftime('%H:%M') if exp else '',
             'lines': self._wa_lines_text(),
+            'lines_short': self._wa_lines_short(),
             'link': self._wa_link(),
         }
 
