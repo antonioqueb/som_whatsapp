@@ -161,9 +161,17 @@ class WhatsappMessage(models.Model):
             vals['attachment_id'] = att.id
         msg = self.sudo().create(vals)
         if partner:
-            partner.message_post(body=_('WhatsApp recibido de %s: %s') % (phone, (msg.body or '')[:300]), message_type='notification')
-        # Punto abierto: aquí se enganchan respuestas automáticas / ruteo.
-        self.env['whatsapp.event'].sudo()._on_inbound(msg)
+            try:
+                partner.message_post(body=_('WhatsApp recibido de %s: %s') % (phone, (msg.body or '')[:300]), message_type='notification')
+            except Exception:  # noqa: BLE001
+                _logger.exception('[WHATSAPP] chatter del contacto no actualizado')
+        # Ruteo: reenvío al asesor + auto-respuesta. Un fallo aquí se registra
+        # pero NO tira el webhook (el mensaje ya quedó en la bitácora).
+        try:
+            self.env['whatsapp.event'].sudo()._on_inbound(msg)
+        except Exception as e:  # noqa: BLE001
+            _logger.exception('[WHATSAPP] ruteo del entrante %s falló', msg.id)
+            msg.write({'error': 'Ruteo falló: %s' % e})
         return msg
 
     @api.model

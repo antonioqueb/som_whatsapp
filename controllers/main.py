@@ -3,7 +3,7 @@
 import json
 import logging
 
-from odoo import http
+from odoo import SUPERUSER_ID, http
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
@@ -13,7 +13,9 @@ class SomWhatsappWebhook(http.Controller):
 
     @http.route('/som_whatsapp/webhook', type='http', auth='none', methods=['POST'], csrf=False, save_session=False)
     def webhook(self, **kw):
-        env = request.env(su=True)
+        # auth='none' deja env.user VACÍO y el chatter (message_post) exige un
+        # usuario: todo el webhook corre como usuario de sistema.
+        env = request.env(user=SUPERUSER_ID)
         token = env['ir.config_parameter'].get_param('som_whatsapp.webhook_token', '')
         if not token or request.httprequest.headers.get('x-webhook-token') != token:
             return request.make_json_response({'error': 'token inválido'}, status=401)
