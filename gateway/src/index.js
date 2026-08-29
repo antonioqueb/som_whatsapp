@@ -29,6 +29,7 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
   downloadMediaMessage,
   makeCacheableSignalKeyStore,
+  proto,
 } from "@whiskeysockets/baileys";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
@@ -102,6 +103,46 @@ async function resolveJid(sock, to) {
   return hit.jid;
 }
 
+// ── Almacén persistente de mensajes ENVIADOS (por sesión) ──
+// WhatsApp pide reintentos cuando el receptor no pudo descifrar; sin
+// `getMessage` el reintento no se puede atender y el teléfono muestra
+// "Esperando el mensaje. Esto puede tomar tiempo" para siempre.
+const SENT_STORE_MAX = 3000;
+function makeSentStore(dir) {
+  const file = path.join(dir, "sent-store.json");
+  let data = {};
+  try { data = JSON.parse(fs.readFileSync(file, "utf8")); } catch (e) { data = {}; }
+  let timer = null;
+  const persist = () => {
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      try { fs.writeFileSync(file, JSON.stringify(data)); } catch (e) { log.warn({ err: e.message }, "sent-store no guardado"); }
+    }, 500);
+  };
+  return {
+    put(id, message) {
+      if (!id || !message) return;
+      try { data[id] = { t: Date.now(), m: Buffer.from(proto.Message.encode(message).finish()).toString("base64") }; } catch (e) { return; }
+      const keys = Object.keys(data);
+      if (keys.length > SENT_STORE_MAX) {
+        keys.sort((a, b) => data[a].t - data[b].t).slice(0, keys.length - SENT_STORE_MAX).forEach((k) => delete data[k]);
+      }
+      persist();
+    },
+    get(id) {
+      const e = id && data[id];
+      if (!e) return undefined;
+      try { return proto.Message.decode(Buffer.from(e.m, "base64")); } catch (e2) { return undefined; }
+    },
+  };
+}
+// Contador de reintentos por mensaje (interfaz CacheStore de Baileys).
+function makeRetryCache() {
+  const m = new Map();
+  return { get: (k) => m.get(k), set: (k, v) => m.set(k, v), del: (k) => m.delete(k), flushAll: () => m.clear() };
+}
+
 async function startSession(id) {
   const existing = sessions.get(id);
   if (existing && (existing.status === "connected" || existing.starting)) return existing;
@@ -109,6 +150,8 @@ async function startSession(id) {
   const dir = path.join(SESSIONS_DIR, id);
   fs.mkdirSync(dir, { recursive: true });
   const { state, saveCreds } = await useMultiFileAuthState(dir);
+  const sentStore = makeSentStore(dir);
+  entry.sentStore = sentStore;
   const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: undefined }));
 
   const entry = existing || { status: "starting", phone: null, qr: null, qrAt: null };
@@ -124,6 +167,10 @@ async function startSession(id) {
     browser: ["SOM Odoo", "Chrome", "1.0"],
     syncFullHistory: false,
     markOnlineOnConnect: false,
+    // Reintentos: Baileys pide aquí el mensaje original cuando el receptor no
+    // pudo descifrarlo; sin esto el receptor ve "Esperando el mensaje…".
+    getMessage: async (key) => sentStore.get(key?.id) || undefined,
+    msgRetryCounterCache: makeRetryCache(),
   });
   entry.sock = sock;
 
@@ -250,6 +297,7 @@ app.post("/sessions/:id/send", wrap(async (req, res) => {
   const jid = await resolveJid(sock, to);
   if (req.body.typing !== false) await humanTyping(sock, jid, String(text));
   const sent = await sock.sendMessage(jid, { text: String(text) });
+  sessions.get(req.params.id)?.sentStore?.put(sent?.key?.id, sent?.message);
   res.json({ id: sent?.key?.id, jid });
 }));
 
@@ -267,6 +315,7 @@ app.post("/sessions/:id/send-media", wrap(async (req, res) => {
   else if (mt.startsWith("audio/")) content = { audio: buffer, mimetype: mt };
   else content = { document: buffer, mimetype: mt, fileName: filename || "archivo", caption: caption || "" };
   const sent = await sock.sendMessage(jid, content);
+  sessions.get(req.params.id)?.sentStore?.put(sent?.key?.id, sent?.message);
   res.json({ id: sent?.key?.id, jid });
 }));
 
