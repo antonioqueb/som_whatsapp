@@ -265,34 +265,50 @@ class WhatsappEvent(models.Model):
         if origin:
             vals.update({'res_model': origin._name, 'res_id': origin.id})
         message.write(vals)
-        body_txt = (message.body or '').strip() or '[archivo adjunto sin texto]'
-        if origin and hasattr(origin, 'message_post'):
-            origin.message_post(body='WhatsApp del cliente al número notificador (%s): %s%s' % (
-                message.phone, body_txt[:500], ' · se reenvió a %s' % seller.name if seller else ' · SIN asesor para reenviar'))
-        ctx = {'client_text': body_txt[:1500]}
-        # (1) reenvío al asesor (o al número de respaldo)
-        forwarded = Msg
-        if seller and seller.phone:
-            forwarded = self.fire('inbound.forward_seller', message, extra_ctx=ctx)
+        body_txt = (message.body or '').strip()
+        att = message.attachment_id
+        if body_txt and att:
+            text_line = '"%s"\n📎 Archivo adjunto en este mensaje' % body_txt[:1500]
+        elif body_txt:
+            text_line = '"%s"' % body_txt[:1500]
         else:
-            fallback = P.get_param('som_whatsapp.fallback_forward_phone') or ''
-            if fallback:
-                base = self._wa_base_ctx(message)
-                base.update(ctx)
-                text = ('📨 Mensaje de cliente *sin asesor asignado*: %s%s\n"%s"\nAsigna un vendedor y contáctalo. Su número: %s') % (
-                    base['client'] or 'Desconocido', (' sobre ' + base['ref']) if base['ref'] else '', base['client_text'], base['client_phone_pretty'])
-                try:
-                    forwarded = Msg.queue(phone=fallback, body=text, res_model='whatsapp.message', res_id=message.id)
-                except Exception as e:  # noqa: BLE001
-                    _logger.warning('[WHATSAPP] reenvío de respaldo no encolado: %s', e)
-        if forwarded and message.attachment_id:
-            for fw in forwarded:
-                try:
-                    Msg.queue(phone=fw.phone, body='📎 Adjunto del cliente %s' % (message.partner_id.display_name or message.phone),
-                              partner=fw.partner_id or None, attachment=message.attachment_id,
-                              res_model='whatsapp.message', res_id=message.id, send_now=False)
-                except Exception as e:  # noqa: BLE001
-                    _logger.warning('[WHATSAPP] adjunto no reenviado: %s', e)
+            text_line = '📎 Archivo adjunto en este mensaje'
+        if origin and hasattr(origin, 'message_post'):
+            att_copy = att.copy({'res_model': origin._name, 'res_id': origin.id}) if att else None
+            origin.message_post(
+                body='WhatsApp del cliente (%s): %s%s' % (
+                    message.phone, body_txt[:500] or '(archivo adjunto)',
+                    ' · reenviado a %s' % seller.name if seller else ' · SIN asesor para reenviar'),
+                attachment_ids=[att_copy.id] if att_copy else [])
+        ctx = {'client_text': body_txt[:1500], 'client_text_line': text_line}
+        # (1) reenvío al asesor (o al número de respaldo): UN solo mensaje, el
+        # contexto va como pie del archivo si lo hay (audio no admite pie: texto + audio).
+        forwarded = Msg
+        fw_ev = self.sudo().search([('key', '=', 'inbound.forward_seller'), ('active', '=', True)], limit=1)
+        to_phone = seller.phone if (seller and seller.phone) else (P.get_param('som_whatsapp.fallback_forward_phone') or '')
+        if fw_ev and to_phone:
+            base = self._wa_base_ctx(message)
+            base.update(ctx)
+            text = fw_ev.template_id.render_for(message, base)
+            if not (seller and seller.phone):
+                text = '📨 *Sin asesor asignado* — ' + text
+            try:
+                is_audio = bool(att) and (att.mimetype or '').startswith('audio/')
+                if att and not is_audio:
+                    forwarded = Msg.queue(phone=to_phone, body=text, partner=seller if (seller and seller.phone) else None,
+                                          attachment=att, res_model='whatsapp.message', res_id=message.id,
+                                          event=fw_ev, template=fw_ev.template_id, send_now=True)
+                else:
+                    forwarded = Msg.queue(phone=to_phone, body=text, partner=seller if (seller and seller.phone) else None,
+                                          res_model='whatsapp.message', res_id=message.id,
+                                          event=fw_ev, template=fw_ev.template_id, send_now=True)
+                    if att:
+                        Msg.queue(phone=to_phone, body='', partner=seller if (seller and seller.phone) else None,
+                                  attachment=att, res_model='whatsapp.message', res_id=message.id, send_now=True)
+            except Exception as e:  # noqa: BLE001
+                _logger.warning('[WHATSAPP] reenvío al asesor no encolado: %s', e)
+        elif not to_phone:
+            _logger.warning('[WHATSAPP] entrante de %s sin asesor ni número de respaldo: no se reenvió', message.phone)
         # (2) auto-respuesta al cliente, una vez por ventana de enfriamiento
         try:
             hours = int(P.get_param('som_whatsapp.autoreply_cooldown_hours', '12') or 12)

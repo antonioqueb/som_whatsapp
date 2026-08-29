@@ -8,9 +8,9 @@
     <record id="wa_template_inbound_forward" model="whatsapp.template">
         <field name="name">Entrante · reenvío al asesor</field>
         <field name="model_id" ref="som_whatsapp.model_whatsapp_message"/>
-        <field name="body">📨 Mensaje del cliente *{{ ctx.get('client') or 'Desconocido' }}*{{ ctx.get('ref') and (' sobre ' + ctx.get('ref')) or '' }}:
-"{{ ctx.get('client_text') }}"
-Ya se le indicó que el seguimiento es contigo. Su número: {{ ctx.get('client_phone_pretty') }}</field>
+        <field name="body">📨 El cliente *{{ ctx.get('client') or 'Desconocido' }}*{{ ctx.get('ref') and (' sobre ' + ctx.get('ref')) or '' }} envió:
+{{ ctx.get('client_text_line') }}
+Dale seguimiento. Su número: {{ ctx.get('client_phone_pretty') }}</field>
     </record>
     <record id="wa_event_inbound_autoreply" model="whatsapp.event">
         <field name="name">Cliente escribe → auto-respuesta</field>
