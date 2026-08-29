@@ -12,7 +12,7 @@ import pytz
 from odoo import api, fields, models
 
 TZ = 'America/Monterrey'
-DEFAULT_OPTOUT = 'BAJA,STOP,ALTO,UNSUBSCRIBE,CANCELAR,NO ME ESCRIBAS,NO ME ESCRIBAN,NO MOLESTAR,NO MAS MENSAJES'
+DEFAULT_OPTOUT = 'BAJA,STOP,UNSUBSCRIBE,DARME DE BAJA,NO ME ESCRIBAS,NO ME ESCRIBAN,NO MOLESTAR,NO MAS MENSAJES,NO QUIERO MENSAJES'
 
 
 def _norm(text):
@@ -93,8 +93,13 @@ class WhatsappPolicy(models.AbstractModel):
             return False
         for kw in self.params()['optout_keywords']:
             k = _norm(kw)
-            if k and (t == k or t.startswith(k + ' ') or (len(k) > 4 and k in t)):
-                return True
+            if not k:
+                continue
+            if ' ' in k:  # frase: basta que venga contenida
+                if k in t:
+                    return True
+            elif t == k or t in (k + ' POR FAVOR', k + ' PORFAVOR', k + ' GRACIAS', k + ' YA'):
+                return True  # palabra sola: exacta (evita 'alto ahí', 'baja el precio'…)
         return False
 
     @api.model
