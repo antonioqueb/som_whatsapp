@@ -80,7 +80,8 @@ class StockLotHoldOrder(models.Model):
         m2 = sum((l.cantidad_m2 or 0.0) for l in lines)
         if not lines:
             return ''
-        return '%d producto(s) · %d placa(s) · %.2f m²' % (len(lines), placas, m2)
+        pl = lambda n, w: '%d %s%s' % (n, w, '' if n == 1 else 's')  # noqa: E731
+        return '%s · %s · %.2f m²' % (pl(len(lines), 'producto'), pl(placas, 'placa'), m2)
 
     def _wa_ctx(self, when_text=''):
         self.ensure_one()
