@@ -163,7 +163,9 @@ class WhatsappEvent(models.Model):
         client_link, seller, seller_phone, seller_link, seller_block, notice, ref, job_suffix."""
         P = self.env['ir.config_parameter'].sudo()
         GW = self.env['whatsapp.gateway']
-        partner = record.partner_id if record._name != 'whatsapp.message' else record.partner_id
+        partner = getattr(record, 'partner_id', False)
+        if partner and partner._name != 'res.partner':
+            partner = False
         client_phone = GW.normalize_phone((partner and partner.phone) or (record._name == 'whatsapp.message' and record.phone) or '')
         ref = record.display_name or ''
         if record._name == 'whatsapp.message' and record.res_model and record.res_id:
