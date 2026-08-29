@@ -20,6 +20,10 @@
         <field name="implied_ids" eval="[(4, ref('group_whatsapp_user'))]"/>
         <field name="comment">Configura gateway, cuentas (QR), plantillas y puntos de conexión.</field>
     </record>
+    <!-- Todo vendedor (grupo de ventas) es usuario de WhatsApp: ve el menú y puede vincular su teléfono. -->
+    <record id="sales_team.group_sale_salesman" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('group_whatsapp_user'))]"/>
+    </record>
     <record id="whatsapp_account_rule_user_read" model="ir.rule">
         <field name="name">WhatsApp: cuentas visibles para usuarios</field>
         <field name="model_id" ref="model_whatsapp_account"/>

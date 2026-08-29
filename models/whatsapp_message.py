@@ -113,7 +113,7 @@ class WhatsappMessage(models.Model):
                         block = self.env['whatsapp.event']._wa_base_ctx(origin).get('seller_block') or ''
                         if block and block not in body:
                             body = (body + '\n' + block).strip()
-                    msg.write({'from_seller': False, 'body': body})
+                    msg.write({'from_seller': False, 'body': body, 'account_id': acc.id})
             if not acc or acc.state != 'connected' or acc.paused:
                 msg.write({'state': 'failed', 'error': _('Sin cuenta WhatsApp conectada (o todas en pausa).'), 'retry_count': msg.retry_count + 1})
                 continue
