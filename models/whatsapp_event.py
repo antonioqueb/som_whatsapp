@@ -259,7 +259,15 @@ class WhatsappEvent(models.Model):
         internal = self.env['res.users'].sudo().search(
             [('share', '=', False), ('active', '=', True), ('partner_id.phone', 'ilike', message.phone[-10:])], limit=1)
         if internal:
-            return False
+            from datetime import timedelta
+            # …salvo que a ese número le hayamos notificado como CLIENTE hace poco
+            # (pruebas del propio equipo, o un vendedor que también compra).
+            notified_as_client = Msg.search_count([
+                ('direction', '=', 'out'), ('phone', '=', message.phone),
+                ('res_model', 'not in', (False, 'whatsapp.message')),
+                ('create_date', '>=', fields.Datetime.now() - timedelta(days=30))])
+            if not notified_as_client:
+                return False
         origin, seller = self._resolve_inbound_origin(message)
         vals = {'seller_partner_id': seller.id if seller else False}
         if origin:
