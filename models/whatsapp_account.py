@@ -92,6 +92,10 @@ class WhatsappAccount(models.Model):
         if not acc:
             key = re.sub(r'[^a-z0-9-]+', '-', (user.login or 'u').split('@')[0].lower()).strip('-') or 'u'
             key = 'v-%s-%d' % (key[:20], user.id)
+            base, n = key, 1
+            while self.sudo().with_context(active_test=False).search_count([('session_key', '=', key)]):
+                n += 1
+                key = '%s-%d' % (base, n)  # la clave anterior puede pertenecer a una cuenta reconvertida/archivada
             acc = self.sudo().create({'name': 'WhatsApp de %s' % user.name, 'session_key': key, 'user_id': user.id, 'is_default': False})
         return {'type': 'ir.actions.act_window', 'res_model': 'whatsapp.account', 'res_id': acc.id,
                 'view_mode': 'form', 'target': 'current', 'name': 'Mi WhatsApp'}
