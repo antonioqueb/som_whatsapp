@@ -30,6 +30,7 @@ import makeWASocket, {
   downloadMediaMessage,
   makeCacheableSignalKeyStore,
   proto,
+  Browsers,
 } from "@whiskeysockets/baileys";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
@@ -175,7 +176,9 @@ async function startSession(id, opts) {
     printQRInTerminal: false,
     auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, log) },
     logger: pino({ level: "silent" }),
-    browser: ["SOM Odoo", "Chrome", "1.0"],
+    // Identidad ESTÁNDAR de navegador: con nombres inventados ("SOM Odoo")
+    // Meta purga el dispositivo (conflict device_removed a medianoche).
+    browser: Browsers.macOS("Chrome"),
     syncFullHistory: false,
     markOnlineOnConnect: false,
     // Reintentos: Baileys pide aquí el mensaje original cuando el receptor no
