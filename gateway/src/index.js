@@ -208,7 +208,16 @@ async function startSession(id, opts) {
       const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
       const loggedOut = code === DisconnectReason.loggedOut;
       entry.status = loggedOut ? "logged_out" : "disconnected";
-      log.warn({ session: id, code, loggedOut }, "sesión cerrada");
+      // Detalle completo del cierre (razón del stream error, p. ej.
+      // device_removed / logged_out / conflict) para diagnosticar 401.
+      const err = lastDisconnect?.error;
+      const detail = {
+        message: err?.message, reason: err?.data?.attrs?.reason || err?.output?.payload?.message,
+        attrs: err?.data?.attrs, tag: err?.data?.tag,
+        content: Array.isArray(err?.data?.content) ? err.data.content.map((c) => ({ tag: c.tag, attrs: c.attrs })) : undefined,
+      };
+      log.warn({ session: id, code, loggedOut, detail }, "sesión cerrada");
+      try { fs.appendFileSync(path.join(SESSIONS_DIR, "disconnects.log"), JSON.stringify({ at: new Date().toISOString(), session: id, code, loggedOut, detail }) + "\n"); } catch (e) { /* opcional */ }
       webhook({ type: "connection", session: id, status: entry.status, phone: entry.phone });
       if (loggedOut) {
         try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
