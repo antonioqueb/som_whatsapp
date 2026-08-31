@@ -334,15 +334,20 @@ class WhatsappAiAssistant(models.AbstractModel):
             return None
         Msg = self.env['whatsapp.message'].sudo().with_context(wa_skip_blocklist=True)
         cfg = self._cfg()
-        if number.reply_mode == 'voice' and cfg['tts_key'] and cfg['tts_voice'] and len(text) <= cfg['tts_max_chars']:
-            try:
-                audio_b64, mimetype = self._tts(text, cfg)
-                ext = 'ogg' if 'ogg' in mimetype or 'opus' in cfg['tts_format'] else 'mp3'
-                return Msg.queue(phone=msg.phone, body='', partner=number.partner_id or msg.partner_id or None,
-                                 account=msg.account_id or None, res_model='whatsapp.message', res_id=msg.id,
-                                 attachment=('respuesta.%s' % ext, audio_b64, mimetype), send_now=True)
-            except Exception as e:  # noqa: BLE001
-                _logger.warning('[WHATSAPP IA] TTS falló, se responde en texto: %s', e)
+        if number.reply_mode == 'voice' and cfg['tts_key'] and cfg['tts_voice']:
+            # Red de seguridad: montos/cantidades a palabras aunque el modelo
+            # los haya dejado en cifras; el tope de caracteres se mide sobre
+            # lo que realmente se locuta.
+            speech = self._voice_normalize(text)
+            if len(speech) <= cfg['tts_max_chars']:
+                try:
+                    audio_b64, mimetype = self._tts(speech, cfg)
+                    ext = 'ogg' if 'ogg' in mimetype or 'opus' in cfg['tts_format'] else 'mp3'
+                    return Msg.queue(phone=msg.phone, body='', partner=number.partner_id or msg.partner_id or None,
+                                     account=msg.account_id or None, res_model='whatsapp.message', res_id=msg.id,
+                                     attachment=('respuesta.%s' % ext, audio_b64, mimetype), send_now=True)
+                except Exception as e:  # noqa: BLE001
+                    _logger.warning('[WHATSAPP IA] TTS falló, se responde en texto: %s', e)
         chunks = []
         while text:
             if len(text) <= MAX_REPLY_CHARS:
@@ -386,6 +391,90 @@ class WhatsappAiAssistant(models.AbstractModel):
         _logger.info('[WHATSAPP IA] audio transcrito en %.1fs: %s', time.time() - t0, text[:120])
         return text.strip()
 
+
+    # ── voz: montos y cantidades EN PALABRAS (los TTS leen mal "193,436.53") ──
+    @staticmethod
+    def _es_int_words(n):
+        n = int(n)
+        if n < 0:
+            return 'menos ' + WhatsappAiAssistant._es_int_words(-n)
+        U = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez',
+             'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve',
+             'veinte', 'veintiuno', 'veintidós', 'veintitrés', 'veinticuatro', 'veinticinco', 'veintiséis',
+             'veintisiete', 'veintiocho', 'veintinueve']
+        T = {3: 'treinta', 4: 'cuarenta', 5: 'cincuenta', 6: 'sesenta', 7: 'setenta', 8: 'ochenta', 9: 'noventa'}
+        H = {1: 'ciento', 2: 'doscientos', 3: 'trescientos', 4: 'cuatrocientos', 5: 'quinientos',
+             6: 'seiscientos', 7: 'setecientos', 8: 'ochocientos', 9: 'novecientos'}
+        def under1000(x):
+            if x < 30:
+                return U[x]
+            if x < 100:
+                t, u = divmod(x, 10)
+                return T[t] + (' y ' + U[u] if u else '')
+            if x == 100:
+                return 'cien'
+            c, r = divmod(x, 100)
+            return H[c] + (' ' + under1000(r) if r else '')
+        def apocope(w):
+            return (w[:-len('uno')] + 'ún') if w.endswith('veintiuno') else ('un' if w == 'uno' else (w[:-4] + ' y un' if w.endswith('y uno') else w))
+        parts = []
+        millones, resto = divmod(n, 1000000)
+        miles, unidades = divmod(resto, 1000)
+        if millones:
+            parts.append('un millón' if millones == 1 else apocope(WhatsappAiAssistant._es_int_words(millones)) + ' millones')
+        if miles:
+            parts.append('mil' if miles == 1 else apocope(under1000(miles)) + ' mil')
+        if unidades or not parts:
+            parts.append(under1000(unidades))
+        return ' '.join(parts)
+
+    @classmethod
+    def _es_amount_words(cls, num_txt, unit):
+        """'193,436.53' + unidad → palabras. Moneda: centavos; cantidades: punto."""
+        clean = num_txt.replace(',', '').replace(' ', '')
+        try:
+            entero, _, dec = clean.partition('.')
+            n = int(entero or 0)
+            dec = (dec or '')[:2]
+        except ValueError:
+            return num_txt + ' ' + unit
+        words = cls._es_int_words(n)
+        singular = {'dólares': 'dólar', 'pesos': 'peso', 'metros cuadrados': 'metro cuadrado',
+                    'empaques': 'empaque', 'cajas': 'caja', 'piezas': 'pieza', 'placas': 'placa'}
+        uword = singular.get(unit, unit) if n == 1 and not dec else unit
+        if n == 1 and not dec:
+            words = 'una' if uword in ('placa', 'caja', 'pieza') else 'un'
+        if unit in ('dólares', 'pesos'):
+            out = '%s %s' % (words, uword)
+            if dec and int(dec.ljust(2, '0')):
+                out += ' con %s centavos' % cls._es_int_words(int(dec.ljust(2, '0')))
+            return out
+        if unit == 'por ciento':
+            return words + ((' punto ' + cls._es_int_words(int(dec))) if dec and int(dec) else '') + ' por ciento'
+        out = words + ((' punto ' + cls._es_int_words(int(dec))) if dec and int(dec) else '')
+        return out + (' ' + uword if uword else '')
+
+    @classmethod
+    def _voice_normalize(cls, text):
+        """Prepara el texto para el TTS: montos y cantidades en palabras
+        (folios, fechas y claves NO se tocan), sin asteriscos ni símbolos."""
+        import re as _re
+        t = text or ''
+        t = t.replace('*', '').replace('_', ' ')
+        t = _re.sub(r'[\U0001F000-\U0001FAFF\u2600-\u27BF\uFE0F]', '', t)  # emojis
+        cur_map = {'USD': 'dólares', 'MXN': 'pesos', 'dólares': 'dólares', 'dolares': 'dólares', 'pesos': 'pesos'}
+        def money(m):
+            return m.group(1) + cls._es_amount_words(m.group(2), cur_map.get(m.group(3), m.group(3)))
+        t = _re.sub(r'(^|[\s(«"\'])\$?\s*([0-9][0-9,]*(?:\.[0-9]+)?)\s*(USD|MXN|dólares|dolares|pesos)\b', money, t)
+        unit_map = {'m²': 'metros cuadrados', 'm2': 'metros cuadrados', 'pzas': 'piezas', 'pza': 'pieza',
+                    'piezas': 'piezas', 'empaques': 'empaques', 'empaque': 'empaques', 'cajas': 'cajas',
+                    'caja': 'cajas', 'placas': 'placas', '%': 'por ciento'}
+        def qty(m):
+            return cls._es_amount_words(m.group(1), unit_map.get(m.group(2), m.group(2)))
+        t = _re.sub(r'\b([0-9][0-9,]*(?:\.[0-9]+)?)\s*(m²|m2|pzas?|piezas|empaques?|cajas?|placas)\b', qty, t)
+        t = _re.sub(r'\b([0-9][0-9,]*(?:\.[0-9]+)?)\s*%', lambda m: cls._es_amount_words(m.group(1), 'por ciento'), t)
+        return _re.sub(r'[ \t]{2,}', ' ', t).strip()
+
     # ── texto a voz (ElevenLabs v3 conversacional) ──
     @api.model
     def _tts(self, text, cfg=None):
@@ -424,6 +513,14 @@ class WhatsappAiAssistant(models.AbstractModel):
             '- Si la consulta es ambigua (varios productos o clientes), muestra las opciones y pide precisar.\n'
             '- Solo consultas: no puedes crear, modificar ni cancelar nada.\n'
         ) % {'company': company.name, 'name': number.name, 'today': today.strftime('%d %b %Y')}
+        if number.reply_mode == 'voice':
+            base += (
+                '- Tu respuesta se CONVIERTE A AUDIO: escribe montos, cantidades y porcentajes EN PALABRAS '
+                '("ciento noventa y tres mil cuatrocientos treinta y seis dólares con cincuenta y tres centavos", '
+                '"ciento veintinueve punto nueve seis metros cuadrados"). Nada de símbolos, tablas, listas largas '
+                'ni asteriscos; frases cortas y naturales, como si lo dijeras hablando. Los folios se deletrean '
+                'natural ("uve trescientos noventa" para V/390).\n'
+            )
         if cfg.get('system_prompt'):
             base += '\n' + cfg['system_prompt'].strip() + '\n'
         if number.extra_prompt:
