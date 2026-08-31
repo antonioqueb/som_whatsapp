@@ -55,7 +55,7 @@ class WhatsappAiNumber(models.Model):
              '(compañías, reglas de registro, costos si tiene el grupo).')
     active = fields.Boolean(default=True)
     daily_limit = fields.Integer(string='Máximo de mensajes por día', default=200)
-    reply_mode = fields.Selection([('text', 'Texto'), ('voice', 'Voz (próximamente)')],
+    reply_mode = fields.Selection([('text', 'Texto'), ('voice', 'Audio (voz ElevenLabs)')],
                                   string='Responde con', default='text', required=True)
     notes = fields.Text(string='Notas')
     extra_prompt = fields.Text(string='Instrucciones adicionales',
@@ -173,6 +173,12 @@ class WhatsappAiAssistant(models.AbstractModel):
             'stt_url': (P.get_param('som_whatsapp.ai_stt_url') or '').rstrip('/'),
             'stt_key': P.get_param('som_whatsapp.ai_stt_key') or '',
             'stt_model': P.get_param('som_whatsapp.ai_stt_model') or 'whisper-1',
+            'tts_url': (P.get_param('som_whatsapp.ai_tts_url') or 'https://api.elevenlabs.io').rstrip('/'),
+            'tts_key': P.get_param('som_whatsapp.ai_tts_key') or '',
+            'tts_voice': P.get_param('som_whatsapp.ai_tts_voice') or '',
+            'tts_model': P.get_param('som_whatsapp.ai_tts_model') or 'eleven_v3',
+            'tts_format': P.get_param('som_whatsapp.ai_tts_format') or 'opus_48000_64',
+            'tts_max_chars': _int('som_whatsapp.ai_tts_max_chars', 2000),
         }
 
     # ── 1. filtro determinista (lo llama el webhook) ──
@@ -278,11 +284,23 @@ class WhatsappAiAssistant(models.AbstractModel):
 
     @api.model
     def _reply(self, msg, number, text):
-        """Responde por la misma cuenta que recibió; textos largos en partes."""
+        """Responde por la misma cuenta que recibió. Modo texto: en partes.
+        Modo voz (ElevenLabs): un audio; si el TTS falla o el texto es muy
+        largo para voz, cae a texto para nunca dejar sin respuesta."""
         text = (text or '').strip()
         if not text:
             return None
         Msg = self.env['whatsapp.message'].sudo().with_context(wa_skip_blocklist=True)
+        cfg = self._cfg()
+        if number.reply_mode == 'voice' and cfg['tts_key'] and cfg['tts_voice'] and len(text) <= cfg['tts_max_chars']:
+            try:
+                audio_b64, mimetype = self._tts(text, cfg)
+                ext = 'ogg' if 'ogg' in mimetype or 'opus' in cfg['tts_format'] else 'mp3'
+                return Msg.queue(phone=msg.phone, body='', partner=number.partner_id or msg.partner_id or None,
+                                 account=msg.account_id or None, res_model='whatsapp.message', res_id=msg.id,
+                                 attachment=('respuesta.%s' % ext, audio_b64, mimetype), send_now=True)
+            except Exception as e:  # noqa: BLE001
+                _logger.warning('[WHATSAPP IA] TTS falló, se responde en texto: %s', e)
         chunks = []
         while text:
             if len(text) <= MAX_REPLY_CHARS:
@@ -325,6 +343,25 @@ class WhatsappAiAssistant(models.AbstractModel):
         text = (resp.json() or {}).get('text') or ''
         _logger.info('[WHATSAPP IA] audio transcrito en %.1fs: %s', time.time() - t0, text[:120])
         return text.strip()
+
+    # ── texto a voz (ElevenLabs v3 conversacional) ──
+    @api.model
+    def _tts(self, text, cfg=None):
+        """Genera el audio con ElevenLabs. Devuelve (base64, mimetype).
+        output_format opus_48000_64 llega a WhatsApp como nota de voz;
+        mp3_44100_64 como archivo de audio."""
+        cfg = cfg or self._cfg()
+        fmt = cfg['tts_format']
+        url = '%s/v1/text-to-speech/%s?output_format=%s' % (cfg['tts_url'], cfg['tts_voice'], fmt)
+        payload = {'text': text, 'model_id': cfg['tts_model']}
+        t0 = time.time()
+        resp = requests.post(url, json=payload, headers={'xi-api-key': cfg['tts_key'], 'Content-Type': 'application/json'},
+                             timeout=cfg['timeout'])
+        if resp.status_code >= 400:
+            raise UserError('TTS %s: %s' % (resp.status_code, resp.text[:200]))
+        mimetype = 'audio/ogg; codecs=opus' if fmt.startswith('opus') else ('audio/mpeg' if fmt.startswith('mp3') else 'audio/wav')
+        _logger.info('[WHATSAPP IA] TTS %s chars en %.1fs (%s)', len(text), time.time() - t0, fmt)
+        return base64.b64encode(resp.content).decode(), mimetype
 
     # ── agente: DeepSeek + herramientas ──
     @api.model

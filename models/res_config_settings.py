@@ -55,6 +55,16 @@ class ResConfigSettings(models.TransientModel):
     wa_ai_stt_key = fields.Char(string='Transcripción de audio: API key', config_parameter='som_whatsapp.ai_stt_key')
     wa_ai_stt_model = fields.Char(string='Transcripción de audio: modelo', config_parameter='som_whatsapp.ai_stt_model', default='whisper-1',
                                   help='OpenAI: whisper-1 · Groq: whisper-large-v3-turbo')
+    wa_ai_tts_url = fields.Char(string='Voz (TTS): URL', config_parameter='som_whatsapp.ai_tts_url', default='https://api.elevenlabs.io')
+    wa_ai_tts_key = fields.Char(string='Voz (TTS): API key', config_parameter='som_whatsapp.ai_tts_key')
+    wa_ai_tts_voice = fields.Char(string='Voz (TTS): voice_id', config_parameter='som_whatsapp.ai_tts_voice',
+                                  help='ID de la voz en ElevenLabs (Voices › copiar Voice ID).')
+    wa_ai_tts_model = fields.Char(string='Voz (TTS): modelo', config_parameter='som_whatsapp.ai_tts_model', default='eleven_v3',
+                                  help='v3 conversacional de ElevenLabs (~280 ms, $0.05/1K caracteres).')
+    wa_ai_tts_format = fields.Char(string='Voz (TTS): formato', config_parameter='som_whatsapp.ai_tts_format', default='opus_48000_64',
+                                   help='opus_48000_64 = nota de voz de WhatsApp · mp3_44100_64 = archivo de audio.')
+    wa_ai_tts_max_chars = fields.Integer(string='Voz (TTS): máximo de caracteres', config_parameter='som_whatsapp.ai_tts_max_chars', default=2000,
+                                         help='Respuestas más largas salen en texto (control de costo).')
     wa_hold_morning_hour = fields.Integer(
         string='Hora de envío (reservas)', config_parameter='som_whatsapp_holds.morning_hour', default=9,
         help='Hora local (Monterrey) a partir de la cual el cron manda los avisos de reservas. '

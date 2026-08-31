@@ -100,6 +100,13 @@
                                 <div class="row mt8"><label for="wa_ai_stt_url" class="col-lg-4 o_light_label"/><field name="wa_ai_stt_url" placeholder="https://api.groq.com/openai/v1"/></div>
                                 <div class="row mt8"><label for="wa_ai_stt_key" class="col-lg-4 o_light_label"/><field name="wa_ai_stt_key" password="True"/></div>
                                 <div class="row mt8"><label for="wa_ai_stt_model" class="col-lg-4 o_light_label"/><field name="wa_ai_stt_model"/></div>
+                                <div class="mt16"><b>Texto → voz</b> (ElevenLabs; responde en audio a los números con "Responde con: Audio"):</div>
+                                <div class="row mt8"><label for="wa_ai_tts_key" class="col-lg-4 o_light_label"/><field name="wa_ai_tts_key" password="True"/></div>
+                                <div class="row mt8"><label for="wa_ai_tts_voice" class="col-lg-4 o_light_label"/><field name="wa_ai_tts_voice"/></div>
+                                <div class="row mt8"><label for="wa_ai_tts_model" class="col-lg-4 o_light_label"/><field name="wa_ai_tts_model"/></div>
+                                <div class="row mt8"><label for="wa_ai_tts_format" class="col-lg-4 o_light_label"/><field name="wa_ai_tts_format"/></div>
+                                <div class="row mt8"><label for="wa_ai_tts_max_chars" class="col-lg-4 o_light_label"/><field name="wa_ai_tts_max_chars"/></div>
+                                <div class="row mt8"><label for="wa_ai_tts_url" class="col-lg-4 o_light_label"/><field name="wa_ai_tts_url"/></div>
                             </div>
                         </setting>
                     </block>
