@@ -442,13 +442,19 @@ class WhatsappAiAssistant(models.AbstractModel):
         singular = {'dólares': 'dólar', 'pesos': 'peso', 'metros cuadrados': 'metro cuadrado',
                     'empaques': 'empaque', 'cajas': 'caja', 'piezas': 'pieza', 'placas': 'placa'}
         uword = singular.get(unit, unit) if n == 1 and not dec else unit
+        if unit in ('dólares', 'pesos'):
+            # NUNCA se leen centavos: el monto se redondea HACIA ARRIBA al
+            # entero (regla del cliente para audio).
+            if dec and int(dec.ljust(2, '0')):
+                n += 1
+                dec = ''
+                words = cls._es_int_words(n)
+            uword = singular.get(unit, unit) if n == 1 else unit
+            if n == 1:
+                words = 'un'
+            return '%s %s' % (words, uword)
         if n == 1 and not dec:
             words = 'una' if uword in ('placa', 'caja', 'pieza') else 'un'
-        if unit in ('dólares', 'pesos'):
-            out = '%s %s' % (words, uword)
-            if dec and int(dec.ljust(2, '0')):
-                out += ' con %s centavos' % cls._es_int_words(int(dec.ljust(2, '0')))
-            return out
         if unit == 'por ciento':
             return words + ((' punto ' + cls._es_int_words(int(dec))) if dec and int(dec) else '') + ' por ciento'
         out = words + ((' punto ' + cls._es_int_words(int(dec))) if dec and int(dec) else '')
@@ -520,6 +526,8 @@ class WhatsappAiAssistant(models.AbstractModel):
                 '"ciento veintinueve punto nueve seis metros cuadrados"). Nada de símbolos, tablas, listas largas '
                 'ni asteriscos; frases cortas y naturales, como si lo dijeras hablando. Los folios se deletrean '
                 'natural ("uve trescientos noventa" para V/390).\n'
+                '- MONTOS EN AUDIO: jamás digas centavos; redondea SIEMPRE hacia arriba al entero '
+                '("193,436.53" se dice "ciento noventa y tres mil cuatrocientos treinta y siete dólares").\n'
                 '- DISCRECIÓN DE PRECIOS EN AUDIO: puede haber un cliente escuchando cerca. Cuando pregunten '
                 'el precio, di ÚNICAMENTE el precio máximo (P1) y no menciones que existen otros niveles. '
                 'Los niveles P2 a P5, descuentos o costos SOLO si este mensaje los pide explícitamente '
