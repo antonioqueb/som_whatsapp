@@ -701,7 +701,12 @@ class WhatsappAiTools(models.AbstractModel):
         if not fn:
             return json.dumps({'error': 'herramienta desconocida: %s' % name})
         user = number.user_id
-        env = self.env(user=user.id, context=dict(self.env.context, allowed_company_ids=user.company_ids.ids or [user.company_id.id], lang='es_MX'))
+        # La compañía ACTIVA del entorno de herramientas es la PREDETERMINADA
+        # del usuario (env.company = primera de allowed_company_ids): si no,
+        # las cotizaciones y precios salían de la primera compañía de la
+        # lista, que puede ser otra.
+        cids = [user.company_id.id] + [c for c in user.company_ids.ids if c != user.company_id.id]
+        env = self.env(user=user.id, context=dict(self.env.context, allowed_company_ids=cids, lang='es_MX'))
         # Los recordsets de Odoo 19 usan __slots__: el contexto viaja por
         # env.context, no como atributos del modelo.
         tool_self = self.with_context(wa_ai_conv_id=conversation.id if conversation else False,
