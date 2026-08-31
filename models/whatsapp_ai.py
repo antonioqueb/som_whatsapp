@@ -206,6 +206,8 @@ class WhatsappAiAssistant(models.AbstractModel):
             return False
         if not (message.body or '').strip() and not message.attachment_id:
             return False
+        if message.ai_state in ('pending', 'processing', 'done'):
+            return True  # ya está en la cola o atendido: no re-marcar
         message.sudo().write({'ai_state': 'pending', 'ai_number_id': number.id})
         cron = self.env.ref('som_whatsapp.ir_cron_whatsapp_ai_process', raise_if_not_found=False)
         if cron:
@@ -217,22 +219,45 @@ class WhatsappAiAssistant(models.AbstractModel):
 
     @api.model
     def _cron_process(self, limit=20):
+        """ANTI-DUPLICADOS. El envío a WhatsApp es un efecto EXTERNO que un
+        rollback no deshace, así que la regla es: (1) cada mensaje se RECLAMA
+        ('processing' + commit, con FOR UPDATE SKIP LOCKED para que dos
+        procesos no tomen el mismo pendiente); (2) un mensaje interrumpido a
+        media respuesta JAMÁS se reintenta — se marca error y el usuario
+        pregunta de nuevo — porque reintentar es lo que duplica respuestas."""
         Msg = self.env['whatsapp.message'].sudo()
-        pending = Msg.search([('ai_state', '=', 'pending'), ('direction', '=', 'in')], order='id', limit=limit)
-        for msg in pending:
+        # Rescate de huérfanos: 'processing' viejo = corrida interrumpida
+        # (reinicio, caída). Se cierra como error SIN responder.
+        stale = Msg.search([('ai_state', '=', 'processing'),
+                            ('write_date', '<', fields.Datetime.now() - timedelta(minutes=30))])
+        if stale:
+            stale.write({'ai_state': 'error',
+                         'error': 'IA: procesamiento interrumpido; no se reintenta para no duplicar respuestas.'})
+            self.env.cr.commit()
+        self.env.cr.execute(
+            """SELECT id FROM whatsapp_message
+               WHERE ai_state = 'pending' AND direction = 'in'
+               ORDER BY id LIMIT %s FOR UPDATE SKIP LOCKED""", (limit,))
+        ids = [r[0] for r in self.env.cr.fetchall()]
+        for mid in ids:
+            msg = Msg.browse(mid)
+            # Reclamo comprometido: desde aquí nadie más lo puede tomar,
+            # ni siquiera si lo que sigue truena y se revierte.
+            msg.write({'ai_state': 'processing'})
+            self.env.cr.commit()
             try:
-                with self.env.cr.savepoint():
-                    msg.write({'ai_state': 'processing'})
-                    self._process_message(msg)
+                self._process_message(msg)
             except Exception as e:  # noqa: BLE001
                 _logger.exception('[WHATSAPP IA] mensaje %s falló', msg.id)
                 msg.write({'ai_state': 'error', 'error': ('IA: %s' % e)[:2000]})
-            self.env.cr.commit()  # cada mensaje se responde aunque el siguiente falle
+            self.env.cr.commit()
         return True
 
     # ── 2-4. procesamiento de un mensaje ──
     @api.model
     def _process_message(self, msg):
+        if msg.ai_state == 'done':
+            return  # ya respondido: idempotencia dura contra re-procesos
         cfg = self._cfg()
         number = msg.ai_number_id or self.env['whatsapp.ai.number']._find_for_phone(msg.phone)
         if not number:
@@ -278,12 +303,17 @@ class WhatsappAiAssistant(models.AbstractModel):
         if err and not answer:
             answer = 'No pude procesar tu consulta en este momento. Intenta de nuevo en unos minutos.'
         reply = self._reply(msg, number, answer)
-        Turn.create({'conversation_id': conv.id, 'role': 'assistant', 'content': answer, 'message_id': msg.id,
-                     'reply_message_id': reply.id if reply else False, 'tokens_in': usage.get('prompt_tokens', 0),
-                     'tokens_out': usage.get('completion_tokens', 0), 'latency_ms': usage.get('latency_ms', 0), 'error': err or False})
-        number.sudo().write({'last_activity': fields.Datetime.now(), 'message_count': number.message_count + 1})
-        conv.write({'last_activity': fields.Datetime.now()})
+        # El envío YA salió: el estado se fija primero y la contabilidad va
+        # en tolerante — un fallo aquí no debe re-encolar (duplicaría).
         msg.write({'ai_state': 'error' if err else 'done', 'error': err or False})
+        try:
+            Turn.create({'conversation_id': conv.id, 'role': 'assistant', 'content': answer, 'message_id': msg.id,
+                         'reply_message_id': reply.id if reply else False, 'tokens_in': usage.get('prompt_tokens', 0),
+                         'tokens_out': usage.get('completion_tokens', 0), 'latency_ms': usage.get('latency_ms', 0), 'error': err or False})
+            number.sudo().write({'last_activity': fields.Datetime.now(), 'message_count': number.message_count + 1})
+            conv.write({'last_activity': fields.Datetime.now()})
+        except Exception:  # noqa: BLE001
+            _logger.exception('[WHATSAPP IA] contabilidad del turno falló (la respuesta ya salió)')
 
     @api.model
     def _conversation_for(self, msg, number):
