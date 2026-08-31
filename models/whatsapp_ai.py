@@ -1110,6 +1110,9 @@ class WhatsappAiTools(models.AbstractModel):
         vals = {
             'partner_id': draft['partner_id'],
             'company_id': env.company.id,
+            # El vendedor es QUIEN DICTA la cotización (el usuario del número),
+            # no el asesor de cartera del cliente.
+            'user_id': env.user.id,
             'origin': 'Asistente IA (audio)',
             'order_line': [(0, 0, {
                 'product_id': l['product_id'],
@@ -1120,6 +1123,10 @@ class WhatsappAiTools(models.AbstractModel):
         if pl:
             vals['pricelist_id'] = pl.id
         order = env['sale.order'].create(vals)
+        # La moneda del borrador MANDA: algunos computes reponen la lista del
+        # cliente al crear; se fija después para que quede la de la moneda dictada.
+        if pl and order.pricelist_id != pl:
+            order.write({'pricelist_id': pl.id})
         try:
             order.message_post(body='Cotización creada por el asistente IA a petición de %s (WhatsApp).' % env.user.name)
         except Exception:  # noqa: BLE001
