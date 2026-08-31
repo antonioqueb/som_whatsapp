@@ -149,7 +149,19 @@ class WhatsappAiAssistant(models.AbstractModel):
     # ── configuración ──
     @api.model
     def _cfg(self):
-        P = self.env['ir.config_parameter'].sudo()
+        # Lectura SIN caché: get_param usa ormcache por proceso y una clave
+        # cargada desde fuera (shell, otro worker) tardaba en verse — el
+        # síntoma real fue "transcripción no configurada" con la clave ya
+        # puesta. La config de la IA se lee una vez por mensaje: SQL directo.
+        self.env.cr.execute(
+            "SELECT key, value FROM ir_config_parameter WHERE key LIKE 'som_whatsapp.ai_%'")
+        raw = dict(self.env.cr.fetchall())
+
+        class P:  # misma interfaz que ir.config_parameter para el resto del método
+            @staticmethod
+            def get_param(key, default=False):
+                v = raw.get(key)
+                return v if v not in (None, '') else default
         def _int(key, default):
             try:
                 return int(P.get_param(key, default) or default)
