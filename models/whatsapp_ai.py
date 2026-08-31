@@ -489,6 +489,14 @@ class WhatsappAiTools(models.AbstractModel):
                  {'texto': {'type': 'string', 'description': 'Nombre del producto (vacío = resumen general)'}, 'limite': {'type': 'integer'}}),
             tool('resumen_ventas', 'Resumen rápido de ventas del periodo: pedidos confirmados, monto total, top clientes y productos.',
                  {'desde': {'type': 'string'}, 'hasta': {'type': 'string'}}),
+            tool('resumen_ejecutivo', 'Foto ejecutiva del negocio para dirección: ventas del periodo, cobranza, inventario, compras/tránsito y señales de alerta. Usar cuando pregunten "cómo vamos", KPIs o estado general.',
+                 {}),
+            tool('cartera_vencida', 'Cuentas por cobrar: saldo total y clientes con facturas vencidas (monto y días). Para dirección/cobranza.',
+                 {'limite': {'type': 'integer'}}),
+            tool('caja_del_dia', 'Caja y cobranza en efectivo: entradas, salidas y saldo del periodo (panel de control interno de efectivo).',
+                 {'periodo': {'type': 'string', 'enum': ['dia', 'semana', 'mes']}}),
+            tool('pedidos_en_riesgo', 'Pedidos confirmados con foco de atención según el semáforo de flujo: sin pago, estancados o dejados, con días y monto pendiente.',
+                 {'limite': {'type': 'integer'}}),
         ]
 
     # ── ejecución ──
@@ -802,3 +810,74 @@ class WhatsappAiTools(models.AbstractModel):
         return {'pedidos': len(orders), 'monto_total': _fmt_money(sum(orders.mapped('amount_total')), cur),
                 'top_clientes': [{'cliente': c, 'monto': round(m, 2)} for c, m in top_clients],
                 'top_productos_m2': [{'producto': p, 'm2': round(q, 2)} for p, q in top_prods]}
+
+    # ── dirección general ──
+    def _t_resumen_ejecutivo(self, env, args):
+        if 'som.analytics' not in env:
+            return {'error': 'analytics no disponible'}
+        try:
+            data = env['som.analytics'].get_exec_summary({})
+        except Exception as e:  # noqa: BLE001
+            return {'error': 'sin acceso al resumen ejecutivo: %s' % str(e)[:120]}
+        if isinstance(data, dict) and data.get('error'):
+            return {'error': str(data['error'])[:200]}
+        return {'resumen_ejecutivo': data}
+
+    def _t_cartera_vencida(self, env, args):
+        limit = self._limit(args, default=10, cap=30)
+        Move = env['account.move']
+        dom = [('move_type', '=', 'out_invoice'), ('state', '=', 'posted'), ('payment_state', 'in', ('not_paid', 'partial')), ('amount_residual', '>', 0)]
+        today = fields.Date.context_today(env['res.partner'])
+        moves = Move.search(dom)
+        por_cliente = {}
+        vencido_total = 0.0
+        total = 0.0
+        for m in moves:
+            total += m.amount_residual_signed or m.amount_residual
+            overdue = bool(m.invoice_date_due and m.invoice_date_due < today)
+            e = por_cliente.setdefault(m.partner_id.id, {'cliente': m.partner_id.display_name, 'vendedor': m.partner_id.user_id.name or '',
+                                                        'saldo': 0.0, 'vencido': 0.0, 'facturas_vencidas': 0, 'mas_antigua_dias': 0})
+            amt = m.amount_residual_signed or m.amount_residual
+            e['saldo'] += amt
+            if overdue:
+                e['vencido'] += amt
+                e['facturas_vencidas'] += 1
+                e['mas_antigua_dias'] = max(e['mas_antigua_dias'], (today - m.invoice_date_due).days)
+                vencido_total += amt
+        rows = sorted(por_cliente.values(), key=lambda r: -r['vencido'])
+        rows = [dict(r, saldo=round(r['saldo'], 2), vencido=round(r['vencido'], 2)) for r in rows if r['vencido'] > 0][:limit]
+        cur = env.company.currency_id.name
+        return {'moneda': cur, 'por_cobrar_total': round(total, 2), 'vencido_total': round(vencido_total, 2), 'clientes_vencidos': rows}
+
+    def _t_caja_del_dia(self, env, args):
+        if 'cash.entry' not in env:
+            return {'error': 'caja no disponible'}
+        periodo = {'dia': 'today', 'semana': 'week', 'mes': 'month'}.get(args.get('periodo') or 'dia', 'today')
+        try:
+            data = env['cash.entry'].get_dashboard_data(period=periodo)
+        except Exception:
+            try:
+                data = env['cash.entry'].get_dashboard_data(period='month')
+            except Exception as e:  # noqa: BLE001
+                return {'error': 'sin acceso a caja: %s' % str(e)[:120]}
+        keep = {k: v for k, v in (data or {}).items() if not isinstance(v, (list, dict)) or k in ('totals', 'summary', 'balance', 'currency', 'period_label')}
+        return {'caja': keep}
+
+    def _t_pedidos_en_riesgo(self, env, args):
+        limit = self._limit(args, default=10, cap=30)
+        SO = env['sale.order']
+        if 'x_flow_status' not in SO._fields:
+            return {'error': 'semáforo no disponible'}
+        dom = [('state', '=', 'sale'), ('x_flow_status', 'in', ('nopay', 'stalled', 'dead', 'slow'))]
+        orders = SO.search(dom, order='x_flow_days desc' if 'x_flow_days' in SO._fields else 'date_order', limit=limit)
+        sel = dict(SO._fields['x_flow_status'].selection)
+        out = []
+        for so in orders:
+            row = {'folio': so.name, 'cliente': so.partner_id.name, 'vendedor': so.user_id.name,
+                   'semaforo': sel.get(so.x_flow_status, so.x_flow_status), 'total': _fmt_money(so.amount_total, so.currency_id.name)}
+            if 'x_flow_days' in SO._fields:
+                row['dias'] = so.x_flow_days
+            if 'x_flow_paid_pct' in SO._fields:
+                row['pagado_pct'] = round(so.x_flow_paid_pct or 0, 1)
+            out.append(row)
+        return {'pedidos_en_riesgo': out, 'total': SO.search_count(dom)}
