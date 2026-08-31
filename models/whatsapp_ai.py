@@ -520,6 +520,11 @@ class WhatsappAiAssistant(models.AbstractModel):
                 '"ciento veintinueve punto nueve seis metros cuadrados"). Nada de símbolos, tablas, listas largas '
                 'ni asteriscos; frases cortas y naturales, como si lo dijeras hablando. Los folios se deletrean '
                 'natural ("uve trescientos noventa" para V/390).\n'
+                '- DISCRECIÓN DE PRECIOS EN AUDIO: puede haber un cliente escuchando cerca. Cuando pregunten '
+                'el precio, di ÚNICAMENTE el precio máximo (P1) y no menciones que existen otros niveles. '
+                'Los niveles P2 a P5, descuentos o costos SOLO si este mensaje los pide explícitamente '
+                '(p. ej. "dame el P3", "todos los niveles", "el mínimo", "el costo"); en ese caso dilos '
+                'breve y sin comentarios extra.\n'
             )
         if cfg.get('system_prompt'):
             base += '\n' + cfg['system_prompt'].strip() + '\n'
