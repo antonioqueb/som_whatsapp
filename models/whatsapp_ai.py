@@ -537,7 +537,7 @@ class WhatsappAiAssistant(models.AbstractModel):
             if dec:
                 out += ' punto ' + (cls._es_int_words(int(dec)) if len(dec) <= 2 else ' '.join(cls._es_int_words(int(d)) for d in dec))
             return out
-        t = _re.sub(r'(?<![\w/\-.])([0-9][0-9,]*(?:\.[0-9]+)?)(?![\w/\-])', bare, t)
+        t = _re.sub(r'(?<![\w/\-.])([0-9](?:[0-9,]*[0-9])?(?:\.[0-9]+)?)(?![\w/\-])', bare, t)
         return _re.sub(r'[ \t]{2,}', ' ', t).strip()
 
     # ── texto a voz (ElevenLabs v3 conversacional) ──
