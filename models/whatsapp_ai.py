@@ -578,9 +578,9 @@ class WhatsappAiTools(models.AbstractModel):
         if not prods and text:
             prods = Prod.search(dom + [('name', 'ilike', text)], limit=limit)
         def score(p):
-            t = p.product_tmpl_id
-            stone = 1 if (getattr(t, 'x_tipo', '') or '') else 0
-            qty = sum(env['stock.quant'].search([('product_id', '=', p.id), ('quantity', '>', 0), ('location_id.usage', '=', 'internal')]).mapped('quantity')) if stone else 0
+            cat = (p.categ_id.complete_name or '').lower()
+            stone = 1 if any(k in cat for k in ('placa', 'formato', 'pieza', 'piedra')) else 0
+            qty = sum(env['stock.quant'].search([('product_id', '=', p.id), ('quantity', '>', 0), ('location_id.usage', '=', 'internal')]).mapped('quantity'))
             return (-stone, -(1 if qty > 0 else 0), -qty, p.display_name)
         return Prod.browse([p.id for p in sorted(prods, key=score)[:limit]])
 
