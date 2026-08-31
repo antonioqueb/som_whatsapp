@@ -100,7 +100,12 @@ class WhatsappAccount(models.Model):
     def action_my_account(self):
         """Menú 'Mi WhatsApp': abre (o crea) la cuenta del usuario actual."""
         user = self.env.user
-        acc = self.sudo().search([('user_id', '=', user.id)], limit=1)
+        # active_test=False: la unicidad por usuario cuenta también las cuentas
+        # ARCHIVADAS; sin esto, con una cuenta archivada el botón intentaba
+        # crear otra y reventaba con UniqueViolation. Se reutiliza y desarchiva.
+        acc = self.sudo().with_context(active_test=False).search([('user_id', '=', user.id)], limit=1)
+        if acc and not acc.active:
+            acc.write({'active': True})
         if not acc:
             key = re.sub(r'[^a-z0-9-]+', '-', (user.login or 'u').split('@')[0].lower()).strip('-') or 'u'
             key = 'v-%s-%d' % (key[:20], user.id)
