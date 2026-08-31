@@ -347,6 +347,7 @@ class WhatsappAiAssistant(models.AbstractModel):
             spoken = _re.sub(r'\s{2,}', ' ', spoken).strip()
             first = None
             for block in text_blocks:
+                block = self._wa_text_normalize(block)
                 sent = Msg.queue(phone=msg.phone, body=block, partner=number.partner_id or msg.partner_id or None,
                                  account=msg.account_id or None, res_model='whatsapp.message', res_id=msg.id, send_now=True)
                 first = first or sent
@@ -368,6 +369,7 @@ class WhatsappAiAssistant(models.AbstractModel):
                                      attachment=('respuesta.%s' % ext, audio_b64, mimetype), send_now=True)
                 except Exception as e:  # noqa: BLE001
                     _logger.warning('[WHATSAPP IA] TTS falló, se responde en texto: %s', e)
+        text = self._wa_text_normalize(text)
         chunks = []
         while text:
             if len(text) <= MAX_REPLY_CHARS:
@@ -411,6 +413,22 @@ class WhatsappAiAssistant(models.AbstractModel):
         _logger.info('[WHATSAPP IA] audio transcrito en %.1fs: %s', time.time() - t0, text[:120])
         return text.strip()
 
+
+    @staticmethod
+    def _wa_text_normalize(text):
+        """Markdown → formato WhatsApp: negritas con UN asterisco (*así*),
+        títulos como línea en negritas, sin restos de markdown; y aire entre
+        bloques para que se lea claro."""
+        import re as _re
+        t = text or ''
+        t = _re.sub(r'\*\*(.+?)\*\*', r'*\1*', t, flags=_re.S)
+        t = _re.sub(r'__(.+?)__', r'_\1_', t, flags=_re.S)
+        t = _re.sub(r'^#{1,6}\s*(.+)$', r'*\1*', t, flags=_re.M)
+        t = _re.sub(r'^[ \t]*[-•]\s*', '• ', t, flags=_re.M)
+        # línea en blanco antes de un renglón que abre en negritas (bloques)
+        t = _re.sub(r'([^\n])\n(\*[^\n*]+\*)', r'\1\n\n\2', t)
+        t = _re.sub(r'\n{3,}', '\n\n', t)
+        return t.strip()
 
     # ── voz: montos y cantidades EN PALABRAS (los TTS leen mal "193,436.53") ──
     @staticmethod
@@ -531,7 +549,9 @@ class WhatsappAiAssistant(models.AbstractModel):
             'Respondes por WhatsApp a %(name)s, que es personal de la empresa. Hoy es %(today)s.\n'
             'REGLAS:\n'
             '- Responde SIEMPRE con datos obtenidos de las herramientas; si no consultaste, dilo. No inventes folios, cantidades ni precios.\n'
-            '- Sé breve y directo, en español, formato WhatsApp (*negritas* para lo importante, listas cortas). Sin markdown de encabezados ni tablas.\n'
+            '- Sé breve y directo, en español, formato WhatsApp: negritas con UN solo asterisco por lado (*así*), '
+            'NUNCA **dos**; nada de encabezados #, tablas ni markdown. Deja AIRE: un dato por renglón y una línea '
+            'en blanco entre bloques (cliente, materiales, precios, total) para que se lea claro.\n'
             '- Cantidades en m² con 2 decimales; dinero con separador de miles y la moneda; fechas como "13 ago 2026".\n'
             '- "Disponible" = existencia libre; "comprometido" = reservado en ventas/entregas; "apartado" = holds activos; '
             '"en tránsito" = en camino (embarques); "taller" = en proceso.\n'
