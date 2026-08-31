@@ -41,7 +41,7 @@ class WhatsappMessage(models.Model):
     event_id = fields.Many2one('whatsapp.event', string='Punto de conexión', ondelete='set null')
     template_id = fields.Many2one('whatsapp.template', string='Plantilla', ondelete='set null')
     user_id = fields.Many2one('res.users', string='Enviado por', default=lambda self: self.env.user)
-    company_id = fields.Many2one('res.company', default=lambda self: self.env.company)
+    company_id = fields.Many2one('res.company', string='Compañía', index=True, default=lambda self: self.env.company)
     pushname = fields.Char(string='Nombre en WhatsApp', help='Nombre que el remitente muestra en WhatsApp (entrantes).')
     priority = fields.Integer(default=5, help='9 = urgente (vencimientos del día); se envía primero y también en domingo.')
     scheduled_at = fields.Datetime(string='No antes de', help='Escalonado anti-ráfaga: la cola no lo manda antes de esta hora.')
@@ -71,11 +71,14 @@ class WhatsappMessage(models.Model):
             raise UserError(_('%s pidió no recibir WhatsApp.') % partner.display_name)
         if not self.env.context.get('wa_skip_blocklist') and self.env['whatsapp.blocklist'].is_blocked(phone):
             raise UserError(_('El número %s pidió no recibir WhatsApp de esta cuenta.') % phone)
+        Account = self.env['whatsapp.account']
+        origin = None
+        if res_model and res_id and res_model in self.env:
+            origin = self.env[res_model].sudo().browse(res_id).exists()
+        # Compañía del mensaje = la del documento origen (no la activa del usuario).
+        company = (Account._company_of(origin) if origin else Account._company_of(None)) or (account and account.company_id) or self.env.company
         if not account:
-            origin = None
-            if res_model and res_id and res_model in self.env and res_model != self._name:
-                origin = self.env[res_model].sudo().browse(res_id).exists()
-            account = self.env['whatsapp.account'].for_record(origin) if origin else self.env['whatsapp.account'].get_default_account()
+            account = Account.for_record(origin) if (origin and res_model != self._name) else Account.get_default_account(company=company)
         att = attachment
         if isinstance(attachment, tuple):
             name, b64, mimetype = attachment
@@ -89,6 +92,7 @@ class WhatsappMessage(models.Model):
             'event_id': event.id if event else False, 'template_id': template.id if template else False,
             'priority': 9 if (event and (event.key or '').startswith('hold.')) else 5,
             'from_seller': bool(account and account.user_id),
+            'company_id': company.id if company else False,
         })
         if send_now:
             msg._send()
@@ -104,7 +108,7 @@ class WhatsappMessage(models.Model):
                 acc = self.env['whatsapp.account'].browse(self.env.context['wa_account_id'])
             body = msg.body or ''
             if not acc or acc.state != 'connected' or acc.paused:
-                acc = self.env['whatsapp.account'].get_default_account()  # failover al genérico
+                acc = self.env['whatsapp.account'].get_default_account(company=msg.company_id or None)  # failover al genérico (de su compañía)
                 if acc and msg.from_seller and not acc.user_id and msg.res_model and msg.res_id and msg.res_model in self.env:
                     # Iba a salir del teléfono del vendedor y cae al genérico: hay que
                     # decirle al cliente con quién seguir.
@@ -189,7 +193,10 @@ class WhatsappMessage(models.Model):
         for msg in msgs:
             if sent >= p['max_per_minute']:
                 break
-            acc = msg.account_id if (msg.account_id in accounts) else accounts[0]
+            if msg.account_id in accounts:
+                acc = msg.account_id
+            else:  # failover: genérico de la compañía del mensaje (o compartido); si no, cualquiera
+                acc = (accounts.filtered(lambda a: not a.user_id and (not a.company_id or a.company_id == msg.company_id)) or accounts)[0]
             internal = msg._is_internal_recipient()  # avisos a vendedores: no gastan el tope diario
             if budget.get(acc.id, 0) <= 0 and not internal:
                 continue
@@ -229,8 +236,9 @@ class WhatsappMessage(models.Model):
                 return None
             if last and last.res_model and last.res_id and last.res_model in self.env and last.res_model != self._name:
                 origin = self.env[last.res_model].sudo().browse(last.res_id).exists() or None
+        company = acc.company_id or acc.user_id.company_id or self.env.company
         vals = {
-            'direction': 'in', 'state': 'received', 'account_id': acc.id,
+            'direction': 'in', 'state': 'received', 'account_id': acc.id, 'company_id': company.id,
             'partner_id': partner.id, 'phone': phone, 'jid': data.get('jid'),
             'body': data.get('text') or '', 'wa_message_id': data.get('id'), 'pushname': data.get('pushname') or False,
             'status_date': fields.Datetime.now(), 'from_seller': bool(acc.user_id),

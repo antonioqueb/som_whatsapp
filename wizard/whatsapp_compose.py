@@ -83,7 +83,11 @@ class WhatsappCompose(models.TransientModel):
         attachments = []
         if self.report_id and self.res_model and self.res_id:
             rec = self.env[self.res_model].browse(self.res_id)
-            pdf, _fmt = self.env['ir.actions.report'].sudo()._render_qweb_pdf(self.report_id.report_name, [rec.id])
+            Report = self.env['ir.actions.report'].sudo()
+            company = self.env['whatsapp.account']._company_of(rec)
+            if company:  # branding/moneda del PDF = compañía del documento
+                Report = Report.with_company(company)
+            pdf, _fmt = Report._render_qweb_pdf(self.report_id.report_name, [rec.id])
             import base64
             fname = '%s - %s.pdf' % ((rec.display_name or 'Documento').replace('/', '-'), self.report_id.name)
             attachments.append((fname, base64.b64encode(pdf).decode(), 'application/pdf'))

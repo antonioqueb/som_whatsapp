@@ -255,6 +255,8 @@ class WhatsappEvent(models.Model):
         Msg = self.env['whatsapp.message'].sudo()
         phone = message.phone or ''
         dom = [('direction', '=', 'out'), ('phone', '=', phone), ('res_model', '!=', False), ('res_id', '!=', 0)]
+        if message.company_id:  # el último saliente de ESTA compañía (o compartido)
+            dom.append(('company_id', 'in', [message.company_id.id, False]))
         last = Msg.search(dom + [('res_model', '!=', 'whatsapp.message')], order='id desc', limit=1)
         origin = self.env['res.partner']
         if last and last.res_model in self.env:

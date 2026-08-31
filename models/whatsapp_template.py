@@ -21,7 +21,8 @@ class WhatsappTemplate(models.Model):
                                        domain="[('model_id', '=', model_id)]",
                                        help='Opcional: PDF del registro que se envía junto al mensaje.')
     active = fields.Boolean(default=True)
-    company_id = fields.Many2one('res.company')
+    company_id = fields.Many2one('res.company', string='Compañía', index=True,
+                                 help='Vacío = compartida entre compañías.')
 
     def render_for(self, record, extra_ctx=None):
         """Texto final para `record`. `ctx` disponible en el marcador."""
@@ -36,7 +37,11 @@ class WhatsappTemplate(models.Model):
         self.ensure_one()
         if not self.attach_report_id:
             return None
-        pdf, _fmt = self.env['ir.actions.report'].sudo()._render_qweb_pdf(self.attach_report_id.report_name, [record.id])
+        Report = self.env['ir.actions.report'].sudo()
+        company = self.env['whatsapp.account']._company_of(record)
+        if company:  # branding/moneda del PDF = compañía del documento
+            Report = Report.with_company(company)
+        pdf, _fmt = Report._render_qweb_pdf(self.attach_report_id.report_name, [record.id])
         import base64
         name = '%s.pdf' % (record.display_name or self.attach_report_id.name).replace('/', '-')
         return (name, base64.b64encode(pdf).decode(), 'application/pdf')

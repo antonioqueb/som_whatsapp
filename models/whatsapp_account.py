@@ -33,7 +33,8 @@ class WhatsappAccount(models.Model):
     qr_image = fields.Binary(string='Código QR', attachment=False, readonly=True)
     qr_at = fields.Datetime(string='QR generado', readonly=True)
     last_sync = fields.Datetime(string='Última sincronización', readonly=True)
-    company_id = fields.Many2one('res.company', default=lambda self: self.env.company)
+    company_id = fields.Many2one('res.company', string='Compañía', index=True, default=lambda self: self.env.company,
+                                 help='Número genérico de ESTA compañía. Vacío = compartida (los teléfonos de vendedor van sin compañía).')
     message_count = fields.Integer(compute='_compute_message_count')
     notes = fields.Text()
 
@@ -75,14 +76,25 @@ class WhatsappAccount(models.Model):
 
     @api.model
     def for_record(self, record):
-        """Ruteo: teléfono del vendedor responsable si está conectado; si no, el genérico."""
+        """Ruteo: teléfono del vendedor responsable si está conectado; si no, el
+        genérico de la compañía del documento."""
+        company = None
         if record is not None and record:
             user = getattr(record, 'user_id', False)
             if user and user._name == 'res.users':
                 acc = self.for_user(user)
                 if acc:
                     return acc
-        return self.get_default_account()
+            company = self._company_of(record)
+        return self.get_default_account(company=company)
+
+    @api.model
+    def _company_of(self, record):
+        """res.company del documento (o vacío si el modelo no la trae)."""
+        company = getattr(record, 'company_id', False) if record is not None and record else False
+        if company and getattr(company, '_name', '') == 'res.company':
+            return company[:1]
+        return self.env['res.company']
 
     @api.model
     def action_my_account(self):
@@ -96,7 +108,9 @@ class WhatsappAccount(models.Model):
             while self.sudo().with_context(active_test=False).search_count([('session_key', '=', key)]):
                 n += 1
                 key = '%s-%d' % (base, n)  # la clave anterior puede pertenecer a una cuenta reconvertida/archivada
-            acc = self.sudo().create({'name': 'WhatsApp de %s' % user.name, 'session_key': key, 'user_id': user.id, 'is_default': False})
+            # Teléfono de vendedor: por usuario, sin compañía (lo ve desde cualquiera).
+            acc = self.sudo().create({'name': 'WhatsApp de %s' % user.name, 'session_key': key, 'user_id': user.id,
+                                      'is_default': False, 'company_id': False})
         return {'type': 'ir.actions.act_window', 'res_model': 'whatsapp.account', 'res_id': acc.id,
                 'view_mode': 'form', 'target': 'current', 'name': 'Mi WhatsApp'}
 
@@ -112,14 +126,32 @@ class WhatsappAccount(models.Model):
             rec.message_count = Msg.search_count([('account_id', '=', rec.id)])
 
     @api.model
-    def get_default_account(self):
+    def get_default_account(self, company=None):
         """Failover: la predeterminada si está viva; si no, cualquier otra cuenta
-        conectada y sin pausa; al final la predeterminada aunque esté caída."""
+        conectada y sin pausa; al final la predeterminada aunque esté caída.
+        Multiempresa: primero el genérico de `company` (la del documento; por
+        defecto la activa) o compartido; si no hay, cualquier genérico (como hoy)."""
         # Solo cuentas GENÉRICAS: el teléfono de un vendedor jamás manda lo de otros.
         live = [('user_id', '=', False), ('state', '=', 'connected'), ('paused', '=', False)]
+        company = company or self.env.company
+        if company:
+            own = [('company_id', 'in', [company.id, False])]
+            acc = (self.search([('is_default', '=', True)] + own + live, limit=1)
+                   or self.search(own + live, order='sequence, id', limit=1))
+            if acc:
+                return acc
         return (self.search([('is_default', '=', True)] + live, limit=1)
                 or self.search(live, order='sequence, id', limit=1)
                 or self.search([('is_default', '=', True), ('user_id', '=', False)], limit=1))
+
+    @api.model
+    def _som_init_multi_company(self):
+        """Data hook (idempotente): los teléfonos de vendedor no son de una
+        compañía; se les quita la que heredaron del default."""
+        accs = self.sudo().with_context(active_test=False).search([('user_id', '!=', False), ('company_id', '!=', False)])
+        if accs:
+            accs.write({'company_id': False})
+        return True
 
     paused = fields.Boolean(string='Envíos en pausa', tracking=True,
                             help='La cola no manda por esta cuenta. Lo activa el detector de bloqueos o un administrador.')

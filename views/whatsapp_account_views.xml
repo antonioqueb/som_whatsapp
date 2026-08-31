@@ -72,6 +72,7 @@
                 <field name="user_id"/>
                 <field name="phone"/>
                 <field name="is_default"/>
+                <field name="company_id" optional="hide" groups="base.group_multi_company"/>
                 <field name="last_sync"/>
                 <field name="paused" widget="boolean_toggle"/>
                 <field name="sent_today"/>
