@@ -256,8 +256,8 @@ class WhatsappAiAssistant(models.AbstractModel):
     # ── 2-4. procesamiento de un mensaje ──
     @api.model
     def _process_message(self, msg):
-        if msg.ai_state == 'done':
-            return  # ya respondido: idempotencia dura contra re-procesos
+        if msg.ai_state not in ('pending', 'processing'):
+            return  # solo se procesa lo reclamado; done/error/skipped jamás se re-responden
         cfg = self._cfg()
         number = msg.ai_number_id or self.env['whatsapp.ai.number']._find_for_phone(msg.phone)
         if not number:
