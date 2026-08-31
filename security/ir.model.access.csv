@@ -10,3 +10,7 @@ access_whatsapp_event_manager,whatsapp.event manager,model_whatsapp_event,group_
 access_whatsapp_compose_user,whatsapp.compose user,model_whatsapp_compose,group_whatsapp_user,1,1,1,1
 access_whatsapp_blocklist_user,whatsapp.blocklist user,model_whatsapp_blocklist,group_whatsapp_user,1,0,0,0
 access_whatsapp_blocklist_manager,whatsapp.blocklist manager,model_whatsapp_blocklist,group_whatsapp_manager,1,1,1,1
+access_whatsapp_ai_number_manager,whatsapp.ai.number manager,model_whatsapp_ai_number,group_whatsapp_manager,1,1,1,1
+access_whatsapp_ai_number_user,whatsapp.ai.number user,model_whatsapp_ai_number,group_whatsapp_user,1,0,0,0
+access_whatsapp_ai_conversation_manager,whatsapp.ai.conversation manager,model_whatsapp_ai_conversation,group_whatsapp_manager,1,1,1,1
+access_whatsapp_ai_turn_manager,whatsapp.ai.turn manager,model_whatsapp_ai_turn,group_whatsapp_manager,1,1,1,1

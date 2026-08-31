@@ -84,7 +84,26 @@
                             </div>
                         </setting>
                     </block>
-                </app>
+                                    <block title="Asistente IA (DeepSeek)" name="whatsapp_ai_block">
+                        <setting string="Asistente IA por WhatsApp" help="Responde consultas de productos, existencias, tránsito, precios, pedidos y clientes SOLO a los números de la lista blanca. Corre con los permisos del usuario ligado a cada número.">
+                            <field name="wa_ai_enabled"/>
+                            <div class="content-group" invisible="not wa_ai_enabled">
+                                <div class="row mt8"><label for="wa_ai_api_url" class="col-lg-4 o_light_label"/><field name="wa_ai_api_url"/></div>
+                                <div class="row mt8"><label for="wa_ai_api_key" class="col-lg-4 o_light_label"/><field name="wa_ai_api_key" password="True"/></div>
+                                <div class="row mt8"><label for="wa_ai_model" class="col-lg-4 o_light_label"/><field name="wa_ai_model"/></div>
+                                <div class="row mt8"><label for="wa_ai_temperature" class="col-lg-4 o_light_label"/><field name="wa_ai_temperature"/></div>
+                                <div class="row mt8"><label for="wa_ai_max_tool_calls" class="col-lg-4 o_light_label"/><field name="wa_ai_max_tool_calls"/></div>
+                                <div class="row mt8"><label for="wa_ai_context_turns" class="col-lg-4 o_light_label"/><field name="wa_ai_context_turns"/></div>
+                                <div class="row mt8"><label for="wa_ai_timeout" class="col-lg-4 o_light_label"/><field name="wa_ai_timeout"/></div>
+                                <div class="row mt8"><label for="wa_ai_system_prompt" class="col-lg-12 o_light_label"/><field name="wa_ai_system_prompt" widget="text" placeholder="Ej. Cuando pregunten por precio da P1 y P2 en USD y MXN…"/></div>
+                                <div class="mt16"><b>Audio → texto</b> (DeepSeek no transcribe; usa Whisper de OpenAI o Groq):</div>
+                                <div class="row mt8"><label for="wa_ai_stt_url" class="col-lg-4 o_light_label"/><field name="wa_ai_stt_url" placeholder="https://api.groq.com/openai/v1"/></div>
+                                <div class="row mt8"><label for="wa_ai_stt_key" class="col-lg-4 o_light_label"/><field name="wa_ai_stt_key" password="True"/></div>
+                                <div class="row mt8"><label for="wa_ai_stt_model" class="col-lg-4 o_light_label"/><field name="wa_ai_stt_model"/></div>
+                            </div>
+                        </setting>
+                    </block>
+</app>
             </xpath>
         </field>
     </record>

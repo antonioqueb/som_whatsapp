@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_whatsapp_ai_number_list" model="ir.ui.view">
+        <field name="name">whatsapp.ai.number.list</field>
+        <field name="model">whatsapp.ai.number</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="phone"/>
+                <field name="partner_id"/>
+                <field name="user_id"/>
+                <field name="reply_mode"/>
+                <field name="daily_limit"/>
+                <field name="message_count"/>
+                <field name="last_activity"/>
+                <field name="active" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_whatsapp_ai_number_form" model="ir.ui.view">
+        <field name="name">whatsapp.ai.number.form</field>
+        <field name="model">whatsapp.ai.number</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <widget name="web_ribbon" title="Archivado" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title"><h1><field name="name" placeholder="Nombre de quien escribe"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="phone" placeholder="52 81 0000 0000"/>
+                            <field name="partner_id"/>
+                            <field name="user_id"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="reply_mode"/>
+                            <field name="daily_limit"/>
+                            <field name="message_count"/>
+                            <field name="last_activity"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="status">
+                        La IA consulta Odoo <b>con los permisos del usuario ligado</b>: solo ve las compañías, pedidos, costos y datos que ese usuario puede ver. Solo lectura: no crea ni modifica nada.
+                    </div>
+                    <notebook>
+                        <page string="Instrucciones adicionales" name="prompt">
+                            <field name="extra_prompt" placeholder="Ej. Responde siempre en tono formal; este usuario es director comercial…"/>
+                        </page>
+                        <page string="Conversaciones" name="conversations">
+                            <field name="conversation_ids" readonly="1">
+                                <list><field name="account_id"/><field name="turn_count"/><field name="last_activity"/></list>
+                            </field>
+                        </page>
+                        <page string="Notas" name="notes"><field name="notes"/></page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_whatsapp_ai_number_search" model="ir.ui.view">
+        <field name="name">whatsapp.ai.number.search</field>
+        <field name="model">whatsapp.ai.number</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/><field name="phone"/><field name="user_id"/>
+                <filter name="inactive" string="Archivados" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+    <record id="action_whatsapp_ai_number" model="ir.actions.act_window">
+        <field name="name">Números autorizados (IA)</field>
+        <field name="res_model">whatsapp.ai.number</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html"><p class="o_view_nocontent_smiling_face">Autoriza un número</p><p>Solo estos números son atendidos por el asistente IA. Cualquier otro sigue el ruteo normal.</p></field>
+    </record>
+
+    <record id="view_whatsapp_ai_turn_list" model="ir.ui.view">
+        <field name="name">whatsapp.ai.turn.list</field>
+        <field name="model">whatsapp.ai.turn</field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0" default_order="id desc">
+                <field name="create_date" string="Fecha"/>
+                <field name="conversation_id"/>
+                <field name="role"/>
+                <field name="tool_name" optional="show"/>
+                <field name="content"/>
+                <field name="was_audio" optional="hide"/>
+                <field name="tokens_in" optional="hide"/>
+                <field name="tokens_out" optional="hide"/>
+                <field name="latency_ms" optional="hide"/>
+                <field name="error" optional="hide"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_whatsapp_ai_conversation_list" model="ir.ui.view">
+        <field name="name">whatsapp.ai.conversation.list</field>
+        <field name="model">whatsapp.ai.conversation</field>
+        <field name="arch" type="xml">
+            <list create="0">
+                <field name="number_id"/>
+                <field name="account_id"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+                <field name="turn_count"/>
+                <field name="last_activity"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_whatsapp_ai_conversation_form" model="ir.ui.view">
+        <field name="name">whatsapp.ai.conversation.form</field>
+        <field name="model">whatsapp.ai.conversation</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0">
+                <sheet>
+                    <group>
+                        <field name="number_id"/><field name="account_id"/><field name="last_activity"/>
+                        <field name="company_id" groups="base.group_multi_company"/>
+                    </group>
+                    <field name="turn_ids">
+                        <list default_order="id">
+                            <field name="create_date" string="Fecha"/>
+                            <field name="role"/>
+                            <field name="tool_name"/>
+                            <field name="tool_args" optional="hide"/>
+                            <field name="content"/>
+                            <field name="was_audio" optional="hide"/>
+                            <field name="latency_ms" optional="hide"/>
+                            <field name="error" optional="hide"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_whatsapp_ai_conversation" model="ir.actions.act_window">
+        <field name="name">Conversaciones IA</field>
+        <field name="res_model">whatsapp.ai.conversation</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="action_whatsapp_ai_turn" model="ir.actions.act_window">
+        <field name="name">Bitácora IA</field>
+        <field name="res_model">whatsapp.ai.turn</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_ai" name="Asistente IA" parent="menu_whatsapp_root" sequence="60" groups="som_whatsapp.group_whatsapp_manager"/>
+    <menuitem id="menu_whatsapp_ai_numbers" name="Números autorizados" parent="menu_whatsapp_ai" action="action_whatsapp_ai_number" sequence="10"/>
+    <menuitem id="menu_whatsapp_ai_conversations" name="Conversaciones" parent="menu_whatsapp_ai" action="action_whatsapp_ai_conversation" sequence="20"/>
+    <menuitem id="menu_whatsapp_ai_turns" name="Bitácora" parent="menu_whatsapp_ai" action="action_whatsapp_ai_turn" sequence="30"/>
+</odoo>

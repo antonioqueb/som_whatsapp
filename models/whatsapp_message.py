@@ -256,6 +256,14 @@ class WhatsappMessage(models.Model):
                 partner.message_post(body=_('WhatsApp recibido de %s: %s') % (phone, (msg.body or '')[:300]), message_type='notification')
             except Exception:  # noqa: BLE001
                 _logger.exception('[WHATSAPP] chatter del contacto no actualizado')
+        # ASISTENTE IA — filtro determinista por lista blanca. Si el número
+        # está autorizado, la IA atiende (en segundo plano) y NO corre el
+        # ruteo normal; si no está, la IA ni se entera.
+        try:
+            if self.env['whatsapp.ai.assistant']._gate(msg):
+                return msg
+        except Exception:  # noqa: BLE001
+            _logger.exception('[WHATSAPP IA] filtro de entrada falló; sigue el ruteo normal')
         if acc.user_id:
             # Teléfono de vendedor: es SU chat; sin auto-respuesta ni reenvío. Solo
             # se deja el rastro (y el archivo) en la orden/reserva de origen.

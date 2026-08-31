@@ -9,3 +9,4 @@ from . import stock_lot_hold_order
 from . import sale_order
 from . import whatsapp_policy
 from . import res_users
+from . import whatsapp_ai

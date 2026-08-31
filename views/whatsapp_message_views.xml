@@ -19,6 +19,7 @@
                 <field name="event_id" optional="hide"/>
                 <field name="company_id" optional="hide" groups="base.group_multi_company"/>
                 <field name="state" widget="badge" decoration-success="state in ('delivered', 'read')" decoration-info="state == 'sent'" decoration-warning="state == 'queued'" decoration-danger="state == 'failed'"/>
+                <field name="ai_state" optional="hide"/>
             </list>
         </field>
     </record>

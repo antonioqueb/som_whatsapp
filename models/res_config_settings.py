@@ -38,6 +38,23 @@ class ResConfigSettings(models.TransientModel):
     wa_optout_keywords = fields.Char(string='Palabras de baja', config_parameter='som_whatsapp.optout_keywords',
                                      help='Separadas por coma. Quien las escriba deja de recibir mensajes al instante.')
     wa_health_guard = fields.Boolean(string='Detector de bloqueos (pausa la cuenta sola)', config_parameter='som_whatsapp.health_guard', default=True)
+
+    # ── Asistente IA (DeepSeek / API compatible con OpenAI) ──
+    wa_ai_enabled = fields.Boolean(string='Asistente IA por WhatsApp', config_parameter='som_whatsapp.ai_enabled',
+                                   help='Solo atiende a los números de la lista blanca (WhatsApp › Asistente IA › Números autorizados).')
+    wa_ai_api_url = fields.Char(string='URL de la API', config_parameter='som_whatsapp.ai_api_url', default='https://api.deepseek.com')
+    wa_ai_api_key = fields.Char(string='API key', config_parameter='som_whatsapp.ai_api_key')
+    wa_ai_model = fields.Char(string='Modelo', config_parameter='som_whatsapp.ai_model', default='deepseek-chat')
+    wa_ai_temperature = fields.Float(string='Temperatura', config_parameter='som_whatsapp.ai_temperature', default=0.2)
+    wa_ai_max_tool_calls = fields.Integer(string='Consultas a Odoo por mensaje (máx.)', config_parameter='som_whatsapp.ai_max_tool_calls', default=6)
+    wa_ai_context_turns = fields.Integer(string='Turnos de contexto', config_parameter='som_whatsapp.ai_context_turns', default=12)
+    wa_ai_timeout = fields.Integer(string='Timeout IA (s)', config_parameter='som_whatsapp.ai_timeout', default=60)
+    wa_ai_system_prompt = fields.Char(string='Instrucciones adicionales (todas las conversaciones)', config_parameter='som_whatsapp.ai_system_prompt')
+    wa_ai_stt_url = fields.Char(string='Transcripción de audio: URL', config_parameter='som_whatsapp.ai_stt_url',
+                                help='API compatible con OpenAI (/audio/transcriptions). Ej. https://api.openai.com/v1 o https://api.groq.com/openai/v1. DeepSeek no transcribe audio.')
+    wa_ai_stt_key = fields.Char(string='Transcripción de audio: API key', config_parameter='som_whatsapp.ai_stt_key')
+    wa_ai_stt_model = fields.Char(string='Transcripción de audio: modelo', config_parameter='som_whatsapp.ai_stt_model', default='whisper-1',
+                                  help='OpenAI: whisper-1 · Groq: whisper-large-v3-turbo')
     wa_hold_morning_hour = fields.Integer(
         string='Hora de envío (reservas)', config_parameter='som_whatsapp_holds.morning_hour', default=9,
         help='Hora local (Monterrey) a partir de la cual el cron manda los avisos de reservas. '
