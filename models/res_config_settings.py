@@ -11,7 +11,10 @@ class ResConfigSettings(models.TransientModel):
                                    help='Debe coincidir con WEBHOOK_TOKEN del gateway.')
     wa_default_country_code = fields.Char(string='Código de país por defecto', config_parameter='som_whatsapp.default_country_code', default='52')
     wa_timeout = fields.Char(string='Timeout (s)', config_parameter='som_whatsapp.timeout', default='20')
-    wa_notice_text = fields.Text(
+    # Char (no Text): res.config.settings solo admite boolean/integer/float/
+    # char/selection/many2one/datetime en campos con config_parameter; con
+    # Text el default_get de Ajustes truena y la pantalla completa no abre.
+    wa_notice_text = fields.Char(
         string='Aviso "solo notificaciones"', config_parameter='som_whatsapp.notice_text',
         help='Texto que va en todo mensaje al cliente: este número no se atiende, el seguimiento es con su asesor. '
              'Vacío = texto por defecto.')
