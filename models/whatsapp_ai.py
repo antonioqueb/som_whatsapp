@@ -100,6 +100,9 @@ class WhatsappAiConversation(models.Model):
     company_id = fields.Many2one('res.company', string='Compañía', index=True)
     last_activity = fields.Datetime(string='Última actividad')
     turn_ids = fields.One2many('whatsapp.ai.turn', 'conversation_id', string='Turnos')
+    draft_quote_json = fields.Text(string='Borrador de cotización',
+                                   help='Estado del flujo guiado de cotización por audio (JSON).')
+    last_quote_order_id = fields.Many2one('sale.order', string='Última cotización creada')
     turn_count = fields.Integer(compute='_compute_turn_count')
     name = fields.Char(compute='_compute_name')
 
@@ -334,6 +337,23 @@ class WhatsappAiAssistant(models.AbstractModel):
             return None
         Msg = self.env['whatsapp.message'].sudo().with_context(wa_skip_blocklist=True)
         cfg = self._cfg()
+        # Bloques [TEXTO]...[/TEXTO]: listas precisas (precios, resúmenes de
+        # cotización) SIEMPRE van como mensaje de texto, aunque la
+        # conversación sea por audio; el resto se locuta.
+        import re as _re
+        text_blocks = [b.strip() for b in _re.findall(r'\[TEXTO\](.*?)\[/TEXTO\]', text, flags=_re.S) if b.strip()]
+        if text_blocks:
+            spoken = _re.sub(r'\[TEXTO\].*?\[/TEXTO\]', ' ', text, flags=_re.S)
+            spoken = _re.sub(r'\s{2,}', ' ', spoken).strip()
+            first = None
+            for block in text_blocks:
+                sent = Msg.queue(phone=msg.phone, body=block, partner=number.partner_id or msg.partner_id or None,
+                                 account=msg.account_id or None, res_model='whatsapp.message', res_id=msg.id, send_now=True)
+                first = first or sent
+            if spoken:
+                voiced = self._reply(msg, number, spoken)
+                first = first or voiced
+            return first
         if number.reply_mode == 'voice' and cfg['tts_key'] and cfg['tts_voice']:
             # Red de seguridad: montos/cantidades a palabras aunque el modelo
             # los haya dejado en cifras; el tope de caracteres se mide sobre
@@ -534,6 +554,21 @@ class WhatsappAiAssistant(models.AbstractModel):
                 '(p. ej. "dame el P3", "todos los niveles", "el mínimo", "el costo"); en ese caso dilos '
                 'breve y sin comentarios extra.\n'
             )
+        base += (
+            'COTIZACIÓN GUIADA (por audio o texto): puedes armar y crear cotizaciones con las herramientas '
+            'cotizacion_borrador y crear_cotizacion. Guion del vaivén:\n'
+            '1) Al pedir una cotización, identifica el CLIENTE (buscar_clientes) y cada MATERIAL '
+            '(buscar_productos). Si algo es ambiguo, ofrece las opciones y pregunta cuál es.\n'
+            '2) Ve armando el borrador con cotizacion_borrador (iniciar, agregar, cantidad, precio, quitar, moneda) '
+            'y CONFIRMA en voz lo que entendiste tras cada paso.\n'
+            '3) Cuando estén los materiales, manda los PRECIOS DE LISTA en un bloque [TEXTO]...[/TEXTO] '
+            '(un renglón por material, bien separado) y pregunta si deja esos precios o te dicta otros.\n'
+            '4) Con precios resueltos, repite el resumen completo (cliente, materiales, cantidades, precios) '
+            'y pide la confirmación FINAL. SOLO con un sí explícito llama crear_cotizacion.\n'
+            '5) Da el folio creado y pregunta si quiere que se la envíes al cliente por WhatsApp; solo con un '
+            'sí explícito llama enviar_cotizacion_cliente. El resumen final también va en [TEXTO].\n'
+            'Nunca inventes ids ni precios: todo sale de las herramientas o de lo que el usuario dicte.\n'
+        )
         if cfg.get('system_prompt'):
             base += '\n' + cfg['system_prompt'].strip() + '\n'
         if number.extra_prompt:
@@ -593,7 +628,7 @@ class WhatsappAiAssistant(models.AbstractModel):
                         args = json.loads(fn.get('arguments') or '{}')
                     except ValueError:
                         args = {}
-                    result = Tools._run(name, args, number)
+                    result = Tools._run(name, args, number, conversation=conv)
                     Turn.create({'conversation_id': conv.id, 'role': 'tool', 'tool_name': name,
                                  'tool_args': json.dumps(args, ensure_ascii=False)[:2000], 'tool_call_id': call.get('id'),
                                  'content': result[:8000]})
@@ -649,16 +684,26 @@ class WhatsappAiTools(models.AbstractModel):
                  {'periodo': {'type': 'string', 'enum': ['dia', 'semana', 'mes']}}),
             tool('pedidos_en_riesgo', 'Pedidos confirmados con foco de atención según el semáforo de flujo: sin pago, estancados o dejados, con días y monto pendiente.',
                  {'limite': {'type': 'integer'}}),
+            tool('cotizacion_borrador', 'Arma la cotización EN CURSO de esta conversación, paso a paso. Acciones: iniciar (cliente_id), agregar (producto_id, cantidad m²), cantidad/precio/quitar (linea 1-based), moneda (USD|MXN), ver, cancelar. Devuelve siempre el borrador completo con precios de lista P1.',
+                 {'accion': {'type': 'string', 'enum': ['iniciar', 'agregar', 'cantidad', 'precio', 'quitar', 'moneda', 'ver', 'cancelar']},
+                  'cliente_id': {'type': 'integer'}, 'producto_id': {'type': 'integer'}, 'linea': {'type': 'integer', 'description': 'número de renglón (1, 2, 3…)'},
+                  'cantidad': {'type': 'number'}, 'precio': {'type': 'number'}, 'moneda': {'type': 'string', 'enum': ['USD', 'MXN']}}, ['accion']),
+            tool('crear_cotizacion', 'Crea en Odoo la cotización del borrador de esta conversación (SOLO tras la confirmación final explícita del usuario). Devuelve el folio.',
+                 {}),
+            tool('enviar_cotizacion_cliente', 'Envía al CLIENTE por WhatsApp el resumen de la última cotización creada en esta conversación (SOLO si el usuario lo pidió explícitamente).',
+                 {}),
         ]
 
     # ── ejecución ──
     @api.model
-    def _run(self, name, args, number):
+    def _run(self, name, args, number, conversation=None):
         fn = getattr(self, '_t_' + name, None)
         if not fn:
             return json.dumps({'error': 'herramienta desconocida: %s' % name})
         user = number.user_id
         env = self.env(user=user.id, context=dict(self.env.context, allowed_company_ids=user.company_ids.ids or [user.company_id.id], lang='es_MX'))
+        self._ctx_conversation = conversation
+        self._ctx_number = number
         try:
             with self.env.cr.savepoint():
                 result = fn(env, args or {})
@@ -962,6 +1007,150 @@ class WhatsappAiTools(models.AbstractModel):
         return {'pedidos': len(orders), 'monto_total': _fmt_money(sum(orders.mapped('amount_total')), cur),
                 'top_clientes': [{'cliente': c, 'monto': round(m, 2)} for c, m in top_clients],
                 'top_productos_m2': [{'producto': p, 'm2': round(q, 2)} for p, q in top_prods]}
+
+    # ── cotización guiada por conversación ──
+    def _quote_draft(self):
+        conv = getattr(self, '_ctx_conversation', None)
+        if not conv:
+            return None, {'error': 'sin conversación activa'}
+        try:
+            draft = json.loads(conv.sudo().draft_quote_json or '{}')
+        except ValueError:
+            draft = {}
+        return conv, draft
+
+    def _quote_save(self, conv, draft):
+        conv.sudo().write({'draft_quote_json': json.dumps(draft, ensure_ascii=False)})
+
+    def _quote_list_price(self, env, product, currency):
+        t = product.product_tmpl_id.with_company(env.company)
+        f = 'x_price_usd_1' if currency == 'USD' else 'x_price_mxn_1'
+        price = getattr(t, f, 0.0) if f in t._fields else 0.0
+        return round(price or (t.list_price if currency != 'USD' else 0.0) or 0.0, 2)
+
+    def _quote_view(self, env, draft):
+        cur = draft.get('moneda') or 'MXN'
+        lineas = []
+        total = 0.0
+        for i, l in enumerate(draft.get('lineas') or [], 1):
+            precio = l.get('precio') if l.get('precio') else l.get('precio_lista')
+            importe = round((precio or 0.0) * (l.get('cantidad') or 0.0), 2)
+            total += importe
+            lineas.append({'n': i, 'producto': l.get('producto'), 'cantidad_m2': l.get('cantidad'),
+                           'precio': precio, 'origen_precio': 'personalizado' if l.get('precio') else 'lista P1',
+                           'precio_lista_P1': l.get('precio_lista'), 'importe': importe})
+        return {'cliente': draft.get('partner_name'), 'cliente_id': draft.get('partner_id'),
+                'moneda': cur, 'lineas': lineas, 'total_estimado': round(total, 2),
+                'folio': draft.get('folio') or None,
+                'nota': 'sin cliente' if not draft.get('partner_id') else ('sin materiales' if not lineas else '')}
+
+    def _t_cotizacion_borrador(self, env, args):
+        conv, draft = self._quote_draft()
+        if conv is None:
+            return draft
+        accion = args.get('accion') or 'ver'
+        draft.setdefault('lineas', [])
+        draft.setdefault('moneda', 'MXN')
+        if accion == 'iniciar':
+            partner = env['res.partner'].browse(int(args.get('cliente_id') or 0)).exists()
+            if not partner:
+                return {'error': 'cliente no encontrado; usa buscar_clientes primero'}
+            draft = {'partner_id': partner.id, 'partner_name': partner.display_name,
+                     'moneda': draft.get('moneda', 'MXN'), 'lineas': [], 'folio': None}
+        elif accion == 'agregar':
+            product = env['product.product'].browse(int(args.get('producto_id') or 0)).exists()
+            if not product:
+                return {'error': 'producto no encontrado; usa buscar_productos primero'}
+            qty = float(args.get('cantidad') or 0.0)
+            if qty <= 0:
+                return {'error': 'falta la cantidad en m² para %s' % product.display_name}
+            draft['lineas'].append({'product_id': product.id, 'producto': product.display_name,
+                                    'cantidad': qty, 'precio': None,
+                                    'precio_lista': self._quote_list_price(env, product, draft['moneda'])})
+        elif accion in ('cantidad', 'precio', 'quitar'):
+            idx = int(args.get('linea') or 0) - 1
+            if idx < 0 or idx >= len(draft['lineas']):
+                return {'error': 'renglón inexistente; usa ver para revisar los números'}
+            if accion == 'quitar':
+                draft['lineas'].pop(idx)
+            elif accion == 'cantidad':
+                draft['lineas'][idx]['cantidad'] = float(args.get('cantidad') or 0.0)
+            else:
+                draft['lineas'][idx]['precio'] = float(args.get('precio') or 0.0) or None
+        elif accion == 'moneda':
+            draft['moneda'] = 'USD' if (args.get('moneda') or '').upper() == 'USD' else 'MXN'
+            for l in draft['lineas']:
+                product = env['product.product'].browse(l['product_id']).exists()
+                l['precio_lista'] = self._quote_list_price(env, product, draft['moneda']) if product else 0.0
+        elif accion == 'cancelar':
+            draft = {}
+        self._quote_save(conv, draft)
+        return self._quote_view(env, draft)
+
+    def _t_crear_cotizacion(self, env, args):
+        conv, draft = self._quote_draft()
+        if conv is None:
+            return draft
+        if not draft.get('partner_id'):
+            return {'error': 'el borrador no tiene cliente'}
+        lineas = draft.get('lineas') or []
+        if not lineas:
+            return {'error': 'el borrador no tiene materiales'}
+        for i, l in enumerate(lineas, 1):
+            if not (l.get('precio') or l.get('precio_lista')):
+                return {'error': 'el renglón %s (%s) no tiene precio ni precio de lista: dicta un precio' % (i, l.get('producto'))}
+        cur = draft.get('moneda') or 'MXN'
+        Pricelist = env['product.pricelist']
+        pl = Pricelist.search([('currency_id.name', '=', cur), ('company_id', 'in', [env.company.id, False])],
+                              order='company_id desc', limit=1)
+        vals = {
+            'partner_id': draft['partner_id'],
+            'company_id': env.company.id,
+            'origin': 'Asistente IA (audio)',
+            'order_line': [(0, 0, {
+                'product_id': l['product_id'],
+                'product_uom_qty': l['cantidad'],
+                'price_unit': l.get('precio') or l.get('precio_lista'),
+            }) for l in lineas],
+        }
+        if pl:
+            vals['pricelist_id'] = pl.id
+        order = env['sale.order'].create(vals)
+        try:
+            order.message_post(body='Cotización creada por el asistente IA a petición de %s (WhatsApp).' % env.user.name)
+        except Exception:  # noqa: BLE001
+            pass
+        draft['folio'] = order.name
+        self._quote_save(conv, draft)
+        conv.sudo().write({'last_quote_order_id': order.id})
+        view = self._quote_view(env, draft)
+        view.update({'folio': order.name, 'total': order.amount_total, 'estado': 'cotización creada (borrador en Odoo)'})
+        return view
+
+    def _t_enviar_cotizacion_cliente(self, env, args):
+        conv, draft = self._quote_draft()
+        if conv is None:
+            return draft
+        order = conv.sudo().last_quote_order_id
+        if not order:
+            return {'error': 'aún no hay cotización creada en esta conversación'}
+        partner = order.partner_id
+        phone = partner.phone or ''
+        if not phone:
+            return {'error': 'el cliente %s no tiene teléfono registrado' % partner.display_name}
+        lines = []
+        for l in order.order_line.filtered(lambda x: not x.display_type):
+            lines.append('• %s — %.2f m² × %s = %s' % (
+                l.product_id.display_name, l.product_uom_qty,
+                _fmt_money(l.price_unit, order.currency_id.name), _fmt_money(l.price_subtotal, order.currency_id.name)))
+        body = ('Buen día %s, le compartimos su cotización %s de %s:%s%s%sTotal: %s%sQuedamos atentos. Su asesor le dará seguimiento.') % (
+            partner.name, order.name, order.company_id.name, chr(10), chr(10).join(lines), chr(10), _fmt_money(order.amount_total, order.currency_id.name), chr(10))
+        number = getattr(self, '_ctx_number', None)
+        acc = conv.account_id or None
+        msg = self.env['whatsapp.message'].sudo().queue(phone=phone, body=body, partner=partner,
+                                                        account=acc, res_model='sale.order', res_id=order.id)
+        return {'enviado_a': partner.display_name, 'telefono': phone, 'folio': order.name,
+                'estado': 'encolado para envío' if msg else 'no se pudo encolar'}
 
     # ── dirección general ──
     def _t_resumen_ejecutivo(self, env, args):
