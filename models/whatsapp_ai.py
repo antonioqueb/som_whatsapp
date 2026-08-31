@@ -702,8 +702,11 @@ class WhatsappAiTools(models.AbstractModel):
             return json.dumps({'error': 'herramienta desconocida: %s' % name})
         user = number.user_id
         env = self.env(user=user.id, context=dict(self.env.context, allowed_company_ids=user.company_ids.ids or [user.company_id.id], lang='es_MX'))
-        self._ctx_conversation = conversation
-        self._ctx_number = number
+        # Los recordsets de Odoo 19 usan __slots__: el contexto viaja por
+        # env.context, no como atributos del modelo.
+        tool_self = self.with_context(wa_ai_conv_id=conversation.id if conversation else False,
+                                      wa_ai_number_id=number.id)
+        fn = getattr(tool_self, '_t_' + name)
         try:
             with self.env.cr.savepoint():
                 result = fn(env, args or {})
@@ -1010,7 +1013,8 @@ class WhatsappAiTools(models.AbstractModel):
 
     # ── cotización guiada por conversación ──
     def _quote_draft(self):
-        conv = getattr(self, '_ctx_conversation', None)
+        conv_id = self.env.context.get('wa_ai_conv_id')
+        conv = self.env['whatsapp.ai.conversation'].sudo().browse(conv_id).exists() if conv_id else None
         if not conv:
             return None, {'error': 'sin conversación activa'}
         try:
@@ -1145,7 +1149,6 @@ class WhatsappAiTools(models.AbstractModel):
                 _fmt_money(l.price_unit, order.currency_id.name), _fmt_money(l.price_subtotal, order.currency_id.name)))
         body = ('Buen día %s, le compartimos su cotización %s de %s:%s%s%sTotal: %s%sQuedamos atentos. Su asesor le dará seguimiento.') % (
             partner.name, order.name, order.company_id.name, chr(10), chr(10).join(lines), chr(10), _fmt_money(order.amount_total, order.currency_id.name), chr(10))
-        number = getattr(self, '_ctx_number', None)
         acc = conv.account_id or None
         msg = self.env['whatsapp.message'].sudo().queue(phone=phone, body=body, partner=partner,
                                                         account=acc, res_model='sale.order', res_id=order.id)
