@@ -561,16 +561,28 @@ class WhatsappAiTools(models.AbstractModel):
         }
 
     def _find_products(self, env, text, limit):
+        """Búsqueda por palabras en nombre/código/color/CATEGORÍA. Prioriza
+        piedra (productos con tipo placa/formato/pieza) y con existencia, y
+        deja al final accesorios/adhesivos que solo coinciden por nombre."""
         Prod = env['product.product']
         dom = [('type', '=', 'consu'), ('sale_ok', '=', True)]
-        words = [w for w in (text or '').split() if w]
+        words = [w for w in (text or '').split() if len(w) > 1]
+        tmpl_fields = env['product.template']._fields
         d = list(dom)
         for w in words:
-            d += ['|', '|', ('name', 'ilike', w), ('default_code', 'ilike', w), ('product_tmpl_id.x_color', 'ilike', w)] if 'x_color' in env['product.template']._fields else ['|', ('name', 'ilike', w), ('default_code', 'ilike', w)]
-        prods = Prod.search(d, limit=limit)
+            ors = [('name', 'ilike', w), ('default_code', 'ilike', w), ('categ_id.complete_name', 'ilike', w)]
+            if 'x_color' in tmpl_fields:
+                ors.append(('product_tmpl_id.x_color', 'ilike', w))
+            d += ['|'] * (len(ors) - 1) + ors
+        prods = Prod.search(d, limit=max(limit * 6, 30))
         if not prods and text:
             prods = Prod.search(dom + [('name', 'ilike', text)], limit=limit)
-        return prods
+        def score(p):
+            t = p.product_tmpl_id
+            stone = 1 if (getattr(t, 'x_tipo', '') or '') else 0
+            qty = sum(env['stock.quant'].search([('product_id', '=', p.id), ('quantity', '>', 0), ('location_id.usage', '=', 'internal')]).mapped('quantity')) if stone else 0
+            return (-stone, -(1 if qty > 0 else 0), -qty, p.display_name)
+        return Prod.browse([p.id for p in sorted(prods, key=score)[:limit]])
 
     # ── herramientas ──
     def _t_buscar_productos(self, env, args):
