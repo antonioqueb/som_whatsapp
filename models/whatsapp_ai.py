@@ -517,6 +517,27 @@ class WhatsappAiAssistant(models.AbstractModel):
             return cls._es_amount_words(m.group(1), unit_map.get(m.group(2), m.group(2)))
         t = _re.sub(r'\b([0-9][0-9,]*(?:\.[0-9]+)?)\s*(m²|m2|pzas?|piezas|empaques?|cajas?|placas)\b', qty, t)
         t = _re.sub(r'\b([0-9][0-9,]*(?:\.[0-9]+)?)\s*%', lambda m: cls._es_amount_words(m.group(1), 'por ciento'), t)
+
+        # REGLA CRUDA: en audio TODO número restante se dice en palabras.
+        # Se protegen folios/claves (pegados a letras, '/' o '-': V/390,
+        # S106-09, COT/985) y los teléfonos (8+ dígitos) se deletrean.
+        def bare(m):
+            raw = m.group(1)
+            clean = raw.replace(',', '')
+            entero, _, dec = clean.partition('.')
+            if len(entero) >= 8 and not dec:
+                return ' '.join(cls._es_int_words(int(d)) for d in entero)
+            try:
+                n = int(entero or 0)
+            except ValueError:
+                return raw
+            if n >= 10 ** 12:
+                return raw
+            out = cls._es_int_words(n)
+            if dec:
+                out += ' punto ' + (cls._es_int_words(int(dec)) if len(dec) <= 2 else ' '.join(cls._es_int_words(int(d)) for d in dec))
+            return out
+        t = _re.sub(r'(?<![\w/\-.])([0-9][0-9,]*(?:\.[0-9]+)?)(?![\w/\-])', bare, t)
         return _re.sub(r'[ \t]{2,}', ' ', t).strip()
 
     # ── texto a voz (ElevenLabs v3 conversacional) ──
@@ -566,6 +587,8 @@ class WhatsappAiAssistant(models.AbstractModel):
                 '"ciento veintinueve punto nueve seis metros cuadrados"). Nada de símbolos, tablas, listas largas '
                 'ni asteriscos; frases cortas y naturales, como si lo dijeras hablando. Los folios se deletrean '
                 'natural ("uve trescientos noventa" para V/390).\n'
+                '- REGLA DURA DE NÚMEROS EN AUDIO: TODO número se dice EN PALABRAS, sin excepción — '
+                'costos all-in, niveles, conteos, cantidades sueltas, fechas. Jamás cifras.\n'
                 '- MONTOS EN AUDIO: jamás digas centavos; redondea SIEMPRE hacia arriba al entero '
                 '("193,436.53" se dice "ciento noventa y tres mil cuatrocientos treinta y siete dólares").\n'
                 '- DISCRECIÓN DE PRECIOS EN AUDIO: puede haber un cliente escuchando cerca. Cuando pregunten '
