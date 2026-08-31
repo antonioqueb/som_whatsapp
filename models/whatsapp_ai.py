@@ -191,7 +191,7 @@ class WhatsappAiAssistant(models.AbstractModel):
             'tts_url': (P.get_param('som_whatsapp.ai_tts_url') or 'https://api.elevenlabs.io').rstrip('/'),
             'tts_key': P.get_param('som_whatsapp.ai_tts_key') or '',
             'tts_voice': P.get_param('som_whatsapp.ai_tts_voice') or '',
-            'tts_model': P.get_param('som_whatsapp.ai_tts_model') or 'eleven_v3',
+            'tts_model': P.get_param('som_whatsapp.ai_tts_model') or 'eleven_v3_conversational',
             'tts_format': P.get_param('som_whatsapp.ai_tts_format') or 'opus_48000_64',
             'tts_max_chars': _int('som_whatsapp.ai_tts_max_chars', 2000),
         }

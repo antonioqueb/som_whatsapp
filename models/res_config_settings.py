@@ -59,8 +59,8 @@ class ResConfigSettings(models.TransientModel):
     wa_ai_tts_key = fields.Char(string='Voz (TTS): API key', config_parameter='som_whatsapp.ai_tts_key')
     wa_ai_tts_voice = fields.Char(string='Voz (TTS): voice_id', config_parameter='som_whatsapp.ai_tts_voice',
                                   help='ID de la voz en ElevenLabs (Voices › copiar Voice ID).')
-    wa_ai_tts_model = fields.Char(string='Voz (TTS): modelo', config_parameter='som_whatsapp.ai_tts_model', default='eleven_v3',
-                                  help='v3 conversacional de ElevenLabs (~280 ms, $0.05/1K caracteres).')
+    wa_ai_tts_model = fields.Char(string='Voz (TTS): modelo', config_parameter='som_whatsapp.ai_tts_model', default='eleven_v3_conversational',
+                                  help='eleven_v3_conversational: v3 Conversational de ElevenLabs (~280 ms, $0.05/1K caracteres). eleven_v3 = expresivo ($0.10/1K).')
     wa_ai_tts_format = fields.Char(string='Voz (TTS): formato', config_parameter='som_whatsapp.ai_tts_format', default='opus_48000_64',
                                    help='opus_48000_64 = nota de voz de WhatsApp · mp3_44100_64 = archivo de audio.')
     wa_ai_tts_max_chars = fields.Integer(string='Voz (TTS): máximo de caracteres', config_parameter='som_whatsapp.ai_tts_max_chars', default=2000,
