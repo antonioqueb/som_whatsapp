@@ -42,6 +42,9 @@ const DEFAULT_CC = process.env.DEFAULT_COUNTRY_CODE || "52";
 const DOWNLOAD_MEDIA = (process.env.DOWNLOAD_MEDIA || "1") === "1";
 
 const log = pino({ level: process.env.LOG_LEVEL || "info" });
+// Bitácora de Baileys (reintentos, descifrado, receipts). Antes iba en
+// "silent" y los fallos de Signal solo se veían como stack traces sueltos.
+const baileysLog = pino({ level: process.env.BAILEYS_LOG_LEVEL || "warn" });
 if (!API_KEY) { log.error("API_KEY vacío: define API_KEY en .env"); process.exit(1); }
 fs.mkdirSync(SESSIONS_DIR, { recursive: true });
 
@@ -149,18 +152,29 @@ function loadSessionOptions(id) {
   try { return JSON.parse(fs.readFileSync(sessionOptionsFile(id), "utf8")); } catch (e) { return {}; }
 }
 
+// Reconexión: espera creciente (3 s → 60 s) para no martillar a Meta cuando
+// rechaza en serie; se reinicia al conectar.
+const RECONNECT_STEPS_MS = [3000, 10000, 30000, 60000];
+
 async function startSession(id, opts) {
   const existing = sessions.get(id);
   if (existing && (existing.status === "connected" || existing.starting)) return existing;
+  if (existing?.reconnectTimer) { clearTimeout(existing.reconnectTimer); existing.reconnectTimer = null; }
 
   const dir = path.join(SESSIONS_DIR, id);
   fs.mkdirSync(dir, { recursive: true });
-  const { state, saveCreds } = await useMultiFileAuthState(dir);
-  const sentStore = makeSentStore(dir);
+  const entry = existing || { status: "starting", phone: null, qr: null, qrAt: null, reconnects: 0 };
+  // UN SOLO estado de claves por sesión, reutilizado en cada reconexión.
+  // Antes cada reconexión releía los archivos y creaba otra caché Signal
+  // mientras el socket anterior aún podía escribir: estado revertido →
+  // "Bad MAC" / "Key used already or never filled" en ambos sentidos
+  // (nosotros sin descifrar entrantes; el teléfono del cliente con
+  // "Esperando el mensaje").
+  if (!entry.auth) entry.auth = await useMultiFileAuthState(dir);
+  const { state, saveCreds } = entry.auth;
+  if (!entry.sentStore) entry.sentStore = makeSentStore(dir);
+  const sentStore = entry.sentStore;
   const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: undefined }));
-
-  const entry = existing || { status: "starting", phone: null, qr: null, qrAt: null };
-  entry.sentStore = sentStore;
   // Opciones por sesión (persisten para el arranque automático). mark_read
   // solo en el número genérico: en el teléfono de un vendedor NO marcamos
   // leídos sus chats.
@@ -171,11 +185,12 @@ async function startSession(id, opts) {
   entry.status = "starting";
   sessions.set(id, entry);
 
+  if (!entry.keyStore) entry.keyStore = makeCacheableSignalKeyStore(state.keys, baileysLog);
   const sock = makeWASocket({
     version,
     printQRInTerminal: false,
-    auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, log) },
-    logger: pino({ level: "silent" }),
+    auth: { creds: state.creds, keys: entry.keyStore },
+    logger: baileysLog,
     // Identidad ESTÁNDAR de navegador: con nombres inventados ("SOM Odoo")
     // Meta purga el dispositivo (conflict device_removed a medianoche).
     browser: Browsers.macOS("Chrome"),
@@ -186,11 +201,16 @@ async function startSession(id, opts) {
     getMessage: async (key) => sentStore.get(key?.id) || undefined,
     msgRetryCounterCache: makeRetryCache(),
   });
+  // Socket anterior (si lo hubo): sus eventos ya no cuentan.
+  const prevSock = entry.sock;
   entry.sock = sock;
+  if (prevSock && prevSock !== sock) { try { prevSock.ev.removeAllListeners(); } catch (e) { /* ya cerrado */ } }
+  const stale = () => entry.sock !== sock;
 
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", async (u) => {
+    if (stale()) return;
     const { connection, lastDisconnect, qr } = u;
     if (qr) {
       entry.qr = await QRCode.toDataURL(qr, { margin: 1, width: 320 });
@@ -203,6 +223,7 @@ async function startSession(id, opts) {
       entry.status = "connected";
       entry.qr = null;
       entry.phone = (sock.user?.id || "").split(":")[0].split("@")[0] || null;
+      entry.reconnects = 0;
       log.info({ session: id, phone: entry.phone }, "sesión conectada");
       webhook({ type: "connection", session: id, status: "connected", phone: entry.phone });
     }
@@ -222,19 +243,33 @@ async function startSession(id, opts) {
       log.warn({ session: id, code, loggedOut, detail }, "sesión cerrada");
       try { fs.appendFileSync(path.join(SESSIONS_DIR, "disconnects.log"), JSON.stringify({ at: new Date().toISOString(), session: id, code, loggedOut, detail }) + "\n"); } catch (e) { /* opcional */ }
       webhook({ type: "connection", session: id, status: entry.status, phone: entry.phone });
+      try { sock.ev.removeAllListeners(); } catch (e) { /* opcional */ }
       if (loggedOut) {
         try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
         entry.phone = null;
-      } else {
-        setTimeout(() => startSession(id).catch((e) => log.error(e, "reconexión falló")), 3000);
+        entry.auth = null; entry.keyStore = null; entry.sentStore = null;
+      } else if (!entry.stopping) {
+        const wait = RECONNECT_STEPS_MS[Math.min(entry.reconnects || 0, RECONNECT_STEPS_MS.length - 1)];
+        entry.reconnects = (entry.reconnects || 0) + 1;
+        entry.reconnectTimer = setTimeout(() => {
+          entry.reconnectTimer = null;
+          startSession(id).catch((e) => log.error(e, "reconexión falló"));
+        }, wait);
       }
     }
   });
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
+    if (stale()) return;
     if (type !== "notify") return;
     for (const m of messages) {
-      if (!m.message || m.key.fromMe) continue;
+      if (m.key.fromMe) continue;
+      if (!m.message) {
+        // Entrante que NO se pudo descifrar (Baileys ya pidió reintento al
+        // emisor). Antes se descartaba en silencio.
+        log.warn({ session: id, from: m.key.remoteJid, id: m.key.id, stub: m.messageStubType }, "entrante sin descifrar");
+        continue;
+      }
       const jid = m.key.remoteJid || "";
       if (jid.endsWith("@g.us") || jid === "status@broadcast") continue; // grupos/estados: fuera
       if (m.key.id && seenIds.has(m.key.id)) continue; // Baileys reentrega (sync/reintentos)
@@ -266,6 +301,7 @@ async function startSession(id, opts) {
   });
 
   sock.ev.on("messages.update", (updates) => {
+    if (stale()) return;
     for (const u of updates) {
       const st = u.update?.status;
       if (st === undefined || st === null) continue;
@@ -343,6 +379,22 @@ app.post("/sessions/:id/send-media", wrap(async (req, res) => {
 }));
 
 app.listen(PORT, () => log.info(`SOM WhatsApp Gateway escuchando en :${PORT}`));
+
+// Apagado limpio (docker stop / rebuild): cerrar sockets sin reconectar y
+// dar tiempo a que se persistan las claves Signal pendientes. Un corte en
+// seco perdía escrituras y dejaba las sesiones desincronizadas (Bad MAC).
+async function shutdown(signal) {
+  log.info({ signal }, "apagando gateway");
+  for (const [sid, e] of sessions) {
+    e.stopping = true;
+    if (e.reconnectTimer) { clearTimeout(e.reconnectTimer); e.reconnectTimer = null; }
+    try { e.sock?.end(undefined); } catch (err) { log.warn({ session: sid, err: err.message }, "cierre de socket"); }
+  }
+  await sleep(2000);
+  process.exit(0);
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 // Reanudar sesiones con credenciales guardadas al arrancar.
 for (const id of fs.readdirSync(SESSIONS_DIR, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)) {
