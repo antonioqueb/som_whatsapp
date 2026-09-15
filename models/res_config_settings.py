@@ -6,7 +6,7 @@ class ResConfigSettings(models.TransientModel):
 
     wa_gateway_url = fields.Char(string='URL del gateway', config_parameter='som_whatsapp.gateway_url',
                                  help='Ej. http://som-whatsapp-gateway:3000 (red interna de Docker).')
-    wa_api_key = fields.Char(string='API key', config_parameter='som_whatsapp.api_key')
+    wa_api_key = fields.Char(string='API key de WhatsApp', config_parameter='som_whatsapp.api_key')
     wa_webhook_token = fields.Char(string='Token de webhook', config_parameter='som_whatsapp.webhook_token',
                                    help='Debe coincidir con WEBHOOK_TOKEN del gateway.')
     wa_default_country_code = fields.Char(string='Código de país por defecto', config_parameter='som_whatsapp.default_country_code', default='52')
@@ -43,7 +43,7 @@ class ResConfigSettings(models.TransientModel):
     wa_ai_enabled = fields.Boolean(string='Asistente IA por WhatsApp', config_parameter='som_whatsapp.ai_enabled',
                                    help='Solo atiende a los números de la lista blanca (WhatsApp › Asistente IA › Números autorizados).')
     wa_ai_api_url = fields.Char(string='URL de la API', config_parameter='som_whatsapp.ai_api_url', default='https://api.deepseek.com')
-    wa_ai_api_key = fields.Char(string='API key', config_parameter='som_whatsapp.ai_api_key')
+    wa_ai_api_key = fields.Char(string='API key del asistente IA', config_parameter='som_whatsapp.ai_api_key')
     wa_ai_model = fields.Char(string='Modelo', config_parameter='som_whatsapp.ai_model', default='deepseek-chat')
     wa_ai_temperature = fields.Float(string='Temperatura', config_parameter='som_whatsapp.ai_temperature', default=0.2)
     wa_ai_max_tool_calls = fields.Integer(string='Consultas a Odoo por mensaje (máx.)', config_parameter='som_whatsapp.ai_max_tool_calls', default=6)
