@@ -11,7 +11,9 @@ from odoo.exceptions import UserError
 class WhatsappAccount(models.Model):
     _name = 'whatsapp.account'
     _description = 'Cuenta WhatsApp (sesión Baileys)'
-    _inherit = ['mail.thread']
+    # mail.activity.mixin: sin él `_pause` nunca pudo agendar la actividad
+    # (el except la tragaba) y `activity_ids` no existía.
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'sequence, id'
 
     name = fields.Char(required=True, tracking=True)
