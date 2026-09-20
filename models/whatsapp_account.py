@@ -171,10 +171,27 @@ class WhatsappAccount(models.Model):
             rec.sent_today = Policy.sent_today(rec) if rec.id else 0
             rec.daily_cap_effective = Policy.daily_cap_for(rec)
 
+    def _som_close_pause_activities(self, feedback):
+        """Cierra "WhatsApp … en pausa" para TODOS los managers (cada uno
+        recibió su propia actividad). La del usuario que reanuda se marca
+        hecha con mensaje en el chatter; las demás se archivan en silencio."""
+        for rec in self:
+            acts = rec.sudo().activity_ids.filtered(
+                lambda a: a.active and (a.summary or '').startswith('WhatsApp') and 'en pausa' in (a.summary or ''))
+            if not acts:
+                continue
+            mine = acts.filtered(lambda a: a.user_id == self.env.user) or acts[:1]
+            try:
+                mine.action_feedback(feedback=feedback)
+            except Exception:
+                mine.unlink()
+            (acts - mine).filtered('active').write({'active': False, 'feedback': feedback})
+
     def action_resume(self):
         self.write({'paused': False, 'pause_reason': False})
         for rec in self:
             rec.message_post(body='Envíos reanudados por %s.' % self.env.user.name)
+            rec._som_close_pause_activities('Reanudado por %s' % self.env.user.name)
         return self._reload()
 
     def _pause(self, reason):
