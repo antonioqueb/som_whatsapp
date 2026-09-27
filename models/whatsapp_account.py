@@ -5,7 +5,7 @@ import base64
 import re
 
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 
 class WhatsappAccount(models.Model):
@@ -189,7 +189,18 @@ class WhatsappAccount(models.Model):
                 mine.unlink()
             (acts - mine).filtered('active').write({'active': False, 'feedback': feedback})
 
+    def _som_check_can_operate(self):
+        """Conectar, cerrar sesión o reanudar: solo la cuenta propia o un
+        administrador de WhatsApp. Antes solo se ocultaba el botón y por RPC
+        cualquiera podía desconectar el teléfono de otro (la baja en el
+        gateway ocurría antes de que Odoo rechazara la escritura)."""
+        if self.env.su or self.env.user.has_group('som_whatsapp.group_whatsapp_manager'):
+            return
+        if any(rec.user_id != self.env.user for rec in self):
+            raise AccessError(_('Solo un administrador de WhatsApp puede operar cuentas que no son suyas.'))
+
     def action_resume(self):
+        self._som_check_can_operate()
         self.write({'paused': False, 'pause_reason': False})
         for rec in self:
             rec.message_post(body='Envíos reanudados por %s.' % self.env.user.name)
@@ -247,6 +258,7 @@ class WhatsappAccount(models.Model):
             rec.write(vals)
 
     def action_start(self):
+        self._som_check_can_operate()
         GW = self.env['whatsapp.gateway']
         for rec in self:
             rec._apply_status(GW._request('POST', '/sessions/%s/start' % rec.session_key, {'mark_read': not rec.user_id}))
@@ -259,6 +271,7 @@ class WhatsappAccount(models.Model):
         return self._reload()
 
     def action_logout(self):
+        self._som_check_can_operate()
         GW = self.env['whatsapp.gateway']
         for rec in self:
             GW._request('DELETE', '/sessions/%s' % rec.session_key, raise_on_error=False)

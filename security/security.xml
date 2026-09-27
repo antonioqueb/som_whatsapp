@@ -44,6 +44,22 @@
         <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
         <field name="domain_force">[(1, '=', 1)]</field>
     </record>
+    <!-- Mensajes: solo administradores los ven todos (27 sep 2026). Un
+         usuario (vendedor) solo toca los que él mismo manda desde sus
+         documentos: sin esto el "Enviar por WhatsApp" no podría crear ni
+         enviar su mensaje. Los envíos automáticos corren como sistema. -->
+    <record id="whatsapp_message_rule_user_own" model="ir.rule">
+        <field name="name">WhatsApp: cada usuario solo sus mensajes enviados</field>
+        <field name="model_id" ref="model_whatsapp_message"/>
+        <field name="groups" eval="[(4, ref('group_whatsapp_user'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+    </record>
+    <record id="whatsapp_message_rule_manager" model="ir.rule">
+        <field name="name">WhatsApp: administradores ven todos los mensajes</field>
+        <field name="model_id" ref="model_whatsapp_message"/>
+        <field name="groups" eval="[(4, ref('group_whatsapp_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
     <record id="whatsapp_message_company_rule" model="ir.rule">
         <field name="name">WhatsApp: multi-compañía</field>
         <field name="model_id" ref="model_whatsapp_message"/>
